@@ -1,7 +1,21 @@
+import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+
+// Local dev convenience: if VITE_OUTLETS isn't set (CI sets it from a GitHub
+// secret), derive it from the git-ignored outlets.local.json used by
+// `npm run deploy`. Only outlet names + /exec URLs reach the client.
+const outletsFile = fileURLToPath(new URL('./outlets.local.json', import.meta.url))
+if (!process.env.VITE_OUTLETS && existsSync(outletsFile)) {
+  const raw = JSON.parse(readFileSync(outletsFile, 'utf8')) as Record<string, { deploymentId?: string }>
+  process.env.VITE_OUTLETS = JSON.stringify(
+    Object.entries(raw)
+      .filter(([name, o]) => !name.startsWith('_') && o?.deploymentId)
+      .map(([name, o]) => ({ name, url: `https://script.google.com/macros/s/${o.deploymentId}/exec` })),
+  )
+}
 
 // https://vite.dev/config/
 export default defineConfig({

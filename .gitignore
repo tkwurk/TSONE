@@ -27,3 +27,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Per-outlet Apps Script IDs (local only — see outlets.example.json)
+outlets.local.json
+.clasp-outlets/
+apps-script-source/.clasp.json

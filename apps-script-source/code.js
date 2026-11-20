@@ -1,32 +1,17 @@
 /**
- * Web app entry point (Snowbee A3.1).
  * Shared helpers live in utils.js — do not redeclare getSheetData, monthKey, etc.
+ *
+ * The server-rendered HTML UI has been removed. The only application entry
+ * point is doPost (apiRouter.gs), used by the PWA client. doGet just reports
+ * status so opening the Web App URL in a browser doesn't error.
  */
-function include(filename) {
-  return HtmlService.createHtmlOutputFromFile(filename)
-      .getContent();
-}
-
-function escapeHtmlForOutput_(text) {
-  return String(text || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
 function doGet(e) {
+  var body = 'TS4 API is running. Use POST /exec with { eventType, payload, ctx }.';
   if (!initializeSpreadsheet()) {
     var detail = getLastSpreadsheetInitError_();
-    var body = 'Error: Could not initialize spreadsheet';
-    if (detail) body += '\n\n' + detail;
-    return HtmlService.createHtmlOutput('<pre style="font:14px/1.5 monospace;padding:16px">' +
-      escapeHtmlForOutput_(body) + '</pre>');
+    body = 'Error: Could not initialize spreadsheet' + (detail ? '\n\n' + detail : '');
   }
-  // Production entry: ui_index only. Legacy index.html is deprecated (Snowbee A1.6).
-  const html = HtmlService.createTemplateFromFile('ui_index')
-    .evaluate()
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  return html;
+  return ContentService.createTextOutput(body).setMimeType(ContentService.MimeType.TEXT);
 }
 
 function getPaymentSources() {

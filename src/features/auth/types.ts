@@ -5,4 +5,6 @@ export interface Session {
   outlet: string
   role: string
   allowedTabs?: string[]
+  /** Client-side only: the outlet backend (VITE_OUTLETS name) this session was created on. */
+  backendOutlet?: string
 }

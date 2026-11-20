@@ -4,8 +4,8 @@
  * ARCHITECTURE (see /AGENTS.md): the Expo/web client talks to the backend through
  * ONE endpoint. doPost receives { eventType, payload } and DELEGATES to the
  * Orchestrator — it contains NO business logic (routing/transport only). The
- * existing doGet (HTML UI, code.js) and google.script.run entry points are
- * untouched; this is purely additive.
+ * legacy server-rendered HTML UI has been removed; doGet (code.js) only returns
+ * a plain-text status line.
  *
  * Request body (POSTed as text/plain to avoid a CORS preflight):
  *   { "eventType": "checkout.completed",

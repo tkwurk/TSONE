@@ -17,7 +17,9 @@ export const dict: Record<Lang, Record<string, string>> = {
     'login.password': 'Password',
     'login.signIn': 'Sign in',
     'login.signingIn': 'Signing in…',
-    'login.setup': 'Set VITE_APPS_SCRIPT_URL in .env.local to sign in.',
+    'login.setup': 'No outlets configured. Set VITE_OUTLETS (or outlets.local.json for local dev) to sign in.',
+    'login.outlet': 'Outlet',
+    'login.chooseOutlet': 'Choose an outlet…',
 
     'tabs.checkout': 'Checkout',
     'tabs.orders': 'Orders',
@@ -547,7 +549,9 @@ export const dict: Record<Lang, Record<string, string>> = {
     'login.password': 'Kata sandi',
     'login.signIn': 'Masuk',
     'login.signingIn': 'Masuk…',
-    'login.setup': 'Atur VITE_APPS_SCRIPT_URL di .env.local untuk masuk.',
+    'login.setup': 'Belum ada outlet. Atur VITE_OUTLETS (atau outlets.local.json untuk pengembangan lokal) untuk masuk.',
+    'login.outlet': 'Outlet',
+    'login.chooseOutlet': 'Pilih outlet…',
 
     'tabs.checkout': 'Kasir',
     'tabs.orders': 'Pesanan',

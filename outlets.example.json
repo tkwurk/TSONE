@@ -1,0 +1,5 @@
+{
+  "_comment": "Copy to outlets.local.json (git-ignored) and fill in one entry per outlet. scriptId: Apps Script editor > Project Settings > Script ID. deploymentId: leave empty for a new outlet; `npm run deploy TS1` creates the Web App deployment and fills it in.",
+  "TS1": { "scriptId": "PASTE_SCRIPT_ID", "deploymentId": "" },
+  "TS2": { "scriptId": "PASTE_SCRIPT_ID", "deploymentId": "" }
+}

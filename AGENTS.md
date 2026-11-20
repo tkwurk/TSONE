@@ -94,12 +94,31 @@ them up in the People/roles sheet, and enforces `requirePermission_` before acti
   external entry point. It parses `{ eventType, payload }` and delegates to
   `Orchestrator.routeEvent`; **no business logic**. It also dispatches `health`
   and the `auth.login` / `auth.logout` events to the existing
-  `authenticateUserClean` / `logoutUser` functions. The existing `doGet` (HTML UI)
-  and `google.script.run` entry points are untouched.
+  `authenticateUserClean` / `logoutUser` functions. The legacy HTML UI has been
+  removed; `doGet` (`code.js`) only returns a plain-text status line.
 - Client: `src/services/api/` (`callApi(eventType, payload, auth)` + typed `api.*`
   wrappers). Posts `text/plain` to skip the CORS preflight; returns the
-  `apiOk`/`apiFail` envelope. Configure `VITE_APPS_SCRIPT_URL` (see `.env.example`).
+  `apiOk`/`apiFail` envelope. The URL is the selected outlet's (see below).
   Operator login lives in `src/features/auth/` and supplies the `_authContext`.
+
+## Multi-outlet deployment
+
+- **One outlet = one Google Sheet + its own bound Apps Script project**, all
+  running the **same** `apps-script-source/` code. Outlets share no data.
+- Each script finds its sheet via its own Script Property `SPREADSHEET_ID`.
+  Sheet IDs never appear in the repo or the client.
+- Script IDs + Web App deployment IDs live only in git-ignored
+  `outlets.local.json` (template: `outlets.example.json`).
+  `apps-script-source/.clasp.json` is git-ignored too. Never commit these IDs.
+- Deploy the backend with `npm run deploy /all` (every outlet) or
+  `npm run deploy TS1` (one outlet) — `scripts/deploy-apps-script.mjs` pushes
+  the code and updates the existing deployment so each `/exec` URL stays fixed.
+- Client: `src/services/api/outlets.ts` reads `VITE_OUTLETS`
+  (`[{ name, url }]`, GitHub repository **secret** in CI; derived from
+  `outlets.local.json` in local dev). The login screen picks the outlet;
+  `apiConfig.appsScriptUrl` resolves to it, and a session is only valid for
+  the outlet it was created on. The URLs are visible in the built JS, which is
+  expected: security comes from server-side auth + execute-as-owner.
 
 ## Dates & timezone (client rule)
 The business runs in the Apps Script project timezone (`appsscript.json`

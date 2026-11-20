@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "icons": "node scripts/generate-icons.cjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "node scripts/deploy-apps-script.mjs",
+    "outlets:secret": "node scripts/deploy-apps-script.mjs --secret"
   },
   "dependencies": {
     "react": "^19.3.1",

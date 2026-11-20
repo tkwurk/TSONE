@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import { getSelectedOutlet } from '@/services/api'
 import type { CartItem } from '../types'
 
 export interface ParkedOrder {
@@ -10,10 +11,19 @@ export interface ParkedOrder {
   parkedAt: string
 }
 
-const storageKey = (username: string) => `ts4.parked.${username || 'anon'}`
+// Scoped by outlet backend too: parked orders must never be submitted to another outlet's sheet.
+const storageKey = (username: string) =>
+  `ts4.parked.${getSelectedOutlet()?.name ?? 'none'}.${username || 'anon'}`
+const legacyKey = (username: string) => `ts4.parked.${username || 'anon'}`
 
 function load(username: string): ParkedOrder[] {
   try {
+    const legacy = localStorage.getItem(legacyKey(username))
+    if (legacy !== null) {
+      // One-time move of pre-multi-outlet parked orders to the outlet in use now.
+      if (localStorage.getItem(storageKey(username)) === null) localStorage.setItem(storageKey(username), legacy)
+      localStorage.removeItem(legacyKey(username))
+    }
     const raw = localStorage.getItem(storageKey(username))
     return raw ? (JSON.parse(raw) as ParkedOrder[]) : []
   } catch {

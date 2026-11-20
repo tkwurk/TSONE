@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import type { Session } from '../types'
 import { loginRequest, logoutRequest } from '../api'
+import { getSelectedOutlet, selectOutlet } from '@/services/api'
 
 const SESSION_KEY = 'ts4.session'
 const DEVICE_KEY = 'ts4.deviceId'
@@ -18,7 +19,10 @@ function getDeviceId(): string {
 function loadSession(): Session | null {
   try {
     const raw = localStorage.getItem(SESSION_KEY)
-    return raw ? (JSON.parse(raw) as Session) : null
+    if (!raw) return null
+    const s = JSON.parse(raw) as Session
+    // A session belongs to one outlet's backend: drop it if that outlet isn't the one selected.
+    return s.backendOutlet && s.backendOutlet === getSelectedOutlet()?.name ? s : null
   } catch {
     return null
   }
@@ -30,13 +34,19 @@ export function useAuth() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const login = useCallback(async (username: string, password: string) => {
+  const login = useCallback(async (username: string, password: string, outletName?: string) => {
+    if (outletName) selectOutlet(outletName)
+    const backendOutlet = getSelectedOutlet()?.name
+    if (!backendOutlet) {
+      setError('Choose an outlet first.')
+      return false
+    }
     setLoading(true)
     setError(null)
     const res = await loginRequest(username, password, getDeviceId())
     setLoading(false)
     if (res.success && res.data) {
-      const s = res.data
+      const s: Session = { ...res.data, backendOutlet }
       localStorage.setItem(DEVICE_KEY, s.deviceId) // backend may canonicalize the id
       localStorage.setItem(SESSION_KEY, JSON.stringify(s))
       setSession(s)

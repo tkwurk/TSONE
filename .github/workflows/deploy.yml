@@ -28,8 +28,14 @@ jobs:
         env:
           # Serve under /<repo>/ on GitHub project pages.
           BASE_PATH: /${{ github.event.repository.name }}/
-          # The deployed Apps Script /exec URL. Set this as a repository variable:
-          # Settings ▸ Secrets and variables ▸ Actions ▸ Variables ▸ New variable.
+          # Outlet list: [{"name":"TS1","url":"https://script.google.com/macros/s/…/exec"}, …]
+          # Generate it locally with `npm run outlets:secret`, then store it as a
+          # repository SECRET named VITE_OUTLETS:
+          # Settings ▸ Secrets and variables ▸ Actions ▸ Secrets ▸ New repository secret.
+          # (Keeps the URLs out of the repo. They still end up in the built JS that
+          # browsers download — unavoidable, since the browser has to call them.)
+          VITE_OUTLETS: ${{ secrets.VITE_OUTLETS }}
+          # Legacy single-backend fallback, used only if VITE_OUTLETS is empty.
           VITE_APPS_SCRIPT_URL: ${{ vars.VITE_APPS_SCRIPT_URL }}
         run: npm run build
       - uses: actions/configure-pages@v5

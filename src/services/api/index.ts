@@ -1,4 +1,5 @@
 export * from './config'
+export * from './outlets'
 export * from './types'
 export * from './client'
 export * from './rpc'
