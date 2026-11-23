@@ -128,7 +128,9 @@ function main() {
   if (args.includes('--secret')) return printSecret(outlets)
 
   const pushOnly = args.includes('--push-only')
-  const targets = args.filter((a) => !a.startsWith('--')).map((a) => a.replace(/^\//, ''))
+  // Keep only the last path segment: "/all" → "all". Git Bash on Windows rewrites
+  // a leading-slash argument into a path (e.g. "C:/Program Files/Git/all").
+  const targets = args.filter((a) => !a.startsWith('--')).map((a) => a.split(/[\\/]/).pop())
   if (!targets.length) {
     fail(`Say which outlet(s) to deploy: npm run deploy /all  |  npm run deploy ${Object.keys(outlets)[0] ?? 'TS1'}\nOutlets: ${Object.keys(outlets).join(', ')}`)
   }
