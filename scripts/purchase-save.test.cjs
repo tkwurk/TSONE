@@ -16,6 +16,8 @@ function setup(options = {}) {
   const accounts = [['Name', 'Type'], ['Expenses', 'Expense'], ['Equipment', 'Investment']]
   let locked = false
   let writes = 0
+  let fullReads = 0
+  const cache = options.cache || new Map()
   const context = vm.createContext({
     Date, SHEETS: { PURCHASES: 'Purchases', ACCOUNTS: 'Accounts' },
     Logger: { log() {} },
@@ -34,6 +36,9 @@ function setup(options = {}) {
     formatTimestampForSheet: (date) => new Date(date),
     invalidatePnLCache_: (outlet) => assert.equal(outlet, 'Main'),
     withAgentGuard_: (label, params, fn) => fn(),
+    buildIdempotencyCacheKey_: (prefix, id) => (id ? prefix + id : ''),
+    getIdempotentResult_: (key) => (cache.has(key) ? JSON.parse(cache.get(key)) : null),
+    putIdempotentResult_: (key, value) => { cache.set(key, JSON.stringify(value)) },
     apiOk: (data, code) => ({ success: true, data, code }),
     apiFail: (error, code) => ({ success: false, error: String(error), code }),
   })
@@ -42,8 +47,10 @@ function setup(options = {}) {
   context.Repo.adapter = {
     getValues(name) {
       if (name === 'Accounts') return accounts.map((r) => r.slice())
-      assert.equal(name, 'Purchases')
       assert.equal(locked, true)
+      if (name === 'Purchases!1:1') return [purchaseRows[0].slice()]
+      assert.equal(name, 'Purchases')
+      fullReads++
       return purchaseRows.map((r) => r.slice())
     },
     updateValues(range, rows) {
@@ -63,7 +70,7 @@ function setup(options = {}) {
     id: 'test-id', username: 'operator', deviceId: 'device', outlet: 'Main',
     account: 'Expenses', payment: 'Cash', items, ...extra,
   })
-  return { submit, secure: (params) => context.recordPurchaseSecure(params), purchaseRows, writes: () => writes, locked: () => locked }
+  return { submit, secure: (params) => context.recordPurchaseSecure(params), purchaseRows, writes: () => writes, locked: () => locked, fullReads: () => fullReads }
 }
 
 test('saves misc and normal lines with legacy layout and investment fields in one append', () => {
@@ -86,12 +93,12 @@ test('existing investment columns and extra columns remain aligned', () => {
   assert.equal(app.purchaseRows[0].length, 23)
 })
 
-test('duplicate IDs are rejected before append and lock is released', () => {
-  const old = Array(20).fill('')
-  old[13] = 'test-id'
-  const app = setup({ rows: [old] })
+test('a re-delivered purchase (same id) is rejected without scanning the sheet', () => {
+  const app = setup()
+  assert.equal(app.submit().success, true)
   assert.equal(app.submit().code, 'PURCHASE_DUPLICATE')
-  assert.equal(app.writes(), 0)
+  assert.equal(app.writes(), 1)
+  assert.equal(app.fullReads(), 0)
   assert.equal(app.locked(), false)
 })
 

@@ -9,7 +9,7 @@
  * REST path (Option B, per-user concurrency) set `Repo.adapter = SheetsAdapter`;
  * to migrate the database, implement a new adapter with the same method surface
  * (getValues / getValuesFromEnd / ensureTable / appendRows / updateValues /
- * clearRange) and set `Repo.adapter`.
+ * clearRange; getHeaders is optional) and set `Repo.adapter`.
  *
  * Methods are collection-oriented and work with row OBJECTS keyed by the sheet's
  * header row, so callers don't depend on column order.
@@ -52,6 +52,21 @@ var Repo = {
       rows.push(this._rowToObject_(headers, values[r]));
     }
     return { headers: headers, rows: rows };
+  },
+
+  /**
+   * Read only the header row (cheap: no data rows). Use before appends instead
+   * of readTable, whose cost grows with the collection.
+   * Same width and trimming as readTable().headers.
+   * @return {string[]} headers; [] if the collection is missing/empty.
+   */
+  readHeaders: function (collection) {
+    var name = this._name(collection);
+    var adapter = this._adapter();
+    var row = (typeof adapter.getHeaders === 'function')
+      ? adapter.getHeaders(name)
+      : ((adapter.getValues(name + '!1:1') || [])[0] || []);
+    return row.map(function (h) { return (h == null ? '' : String(h)).trim(); });
   },
 
   /** Convenience: just the row objects for a collection. */
@@ -147,7 +162,7 @@ var Repo = {
   appendObjects: function (collection, objects) {
     var list = Array.isArray(objects) ? objects : [objects];
     if (!list.length) return { appended: 0 };
-    var headers = this.readTable(collection).headers;
+    var headers = this.readHeaders(collection);
     if (!headers.length) {
       throw new Error('Repo.appendObjects: collection "' + collection + '" has no header row.');
     }

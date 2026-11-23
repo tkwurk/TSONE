@@ -84,7 +84,8 @@ function recordPurchase(purchase) {
       return apiFail('Device ID and username are required to record a purchase.', 'PURCHASE_AUTH_REQUIRED');
     }
 
-    const session = getUserSessionEnhanced(deviceId, username) || {};
+    // recordPurchaseSecure already authenticated + refreshed this session.
+    const session = getUserSessionEnhanced(deviceId, username, { skipPeopleRefresh: true }) || {};
     const timestamp = new Date();
     const purchaseId = purchase.id || (timestamp.getTime() + '_' + Math.random().toString(36).substr(2, 9));
 
@@ -124,17 +125,21 @@ function recordPurchase(purchase) {
       ]);
     });
 
+    // Duplicate guard: the client sends a fresh id per submit, so a duplicate can
+    // only be the SAME request delivered twice (network retry) within minutes.
+    // A short-lived cache entry catches that without scanning the whole
+    // Purchases sheet (which grows forever) inside the lock.
+    const idemKey = buildIdempotencyCacheKey_('purchase_', purchaseId);
+
     const lock = LockService.getScriptLock();
     lock.waitLock(30000);
     try {
-      const table = Repo.readTable('PURCHASES');
-      const headers = table.headers.slice();
-      if (!headers.length) return apiFail('Purchases sheet not found or has no headers.', 'PURCHASE_SHEET_MISSING');
-      if (headers.length < 20) throw new Error('Purchases sheet requires at least 20 columns.');
-      const purchaseIdIdx = headers.findIndex(h => /purchase.*id|id/i.test(h));
-      if (purchaseIdIdx !== -1 && table.rows.some(row => row[headers[purchaseIdIdx]] === purchaseId)) {
+      if (idemKey && getIdempotentResult_(idemKey)) {
         return apiFail('Duplicate purchase detected. Please try again.', 'PURCHASE_DUPLICATE');
       }
+      const headers = Repo.readHeaders('PURCHASES');
+      if (!headers.length) return apiFail('Purchases sheet not found or has no headers.', 'PURCHASE_SHEET_MISSING');
+      if (headers.length < 20) throw new Error('Purchases sheet requires at least 20 columns.');
       var investIdx = headers.findIndex(h => /is\s*investment/i.test(h));
       var sourceIdx = headers.findIndex(h => /source\s*account/i.test(h));
       const oldLength = headers.length;
@@ -151,6 +156,7 @@ function recordPurchase(purchase) {
         return row;
       });
       Repo.appendRows('PURCHASES', completeRows);
+      if (idemKey) putIdempotentResult_(idemKey, { purchaseId: purchaseId }, 600);
     } finally {
       lock.releaseLock();
     }
@@ -603,7 +609,9 @@ function regenerateAllPurchaseProductCodes() {
  */
 function getOrderedPurchases(deviceId, username) {
   try {
-    const session = getUserSessionEnhanced(deviceId, username) || {};
+    // No session → no data (it used to fall back to "no outlet" = every outlet's rows).
+    const session = getUserSessionEnhanced(deviceId, username);
+    if (!session || !session.username) return { success: false, data: [], error: 'Invalid or expired session' };
     const userOutlet = session.outlet;
 
     const sheet = getGlobalSpreadsheet().getSheetByName(SHEETS.PURCHASES);
@@ -657,9 +665,11 @@ function getOrderedPurchases(deviceId, username) {
  */
 function updateReceiveQuantitySecure(params) {
   try {
-    var authContext = params._authContext;
-    if (!authContext || !authContext.username) {
-      throw new Error("Authentication required.");
+    // Real session check (it used to trust any username in the request).
+    var session = requireAuth_(params);
+    var tabs = resolveEffectiveTabsFromSession(session);
+    if (tabs.indexOf('*') < 0 && tabs.indexOf('purchasingReceive') < 0 && tabs.indexOf('purchasing') < 0) {
+      throw new Error("Permission denied: purchasingReceive");
     }
 
     var rowIndex    = parseInt(params.rowIndex, 10);
@@ -669,19 +679,38 @@ function updateReceiveQuantitySecure(params) {
 
     const sheet = getGlobalSpreadsheet().getSheetByName(SHEETS.PURCHASES);
     if (!sheet) throw new Error("Purchases sheet not found.");
+    if (rowIndex > sheet.getLastRow()) throw new Error("Invalid row index.");
 
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const width = sheet.getLastColumn();
+    const headers = sheet.getRange(1, 1, 1, width).getValues()[0];
     const pstatusIdx = headers.findIndex(h => /pstatus/i.test(h));
     const rqtyIdx    = headers.findIndex(h => /rquantity/i.test(h));
+    const outletIdx  = headers.findIndex(h => /outlet/i.test(h));
 
     if (pstatusIdx === -1 || rqtyIdx === -1) {
       throw new Error("PSTATUS or RQUANTITY column not found in Purchases sheet. Please add the column headers.");
     }
 
-    sheet.getRange(rowIndex, pstatusIdx + 1).setValue("RECEIVED");
-    sheet.getRange(rowIndex, rqtyIdx + 1).setValue(rquantity);
+    // Same outlet rule as getOrderedPurchases: only this outlet's rows.
+    const row = sheet.getRange(rowIndex, 1, 1, width).getValues()[0];
+    const userOutlet = String(session.outlet || '');
+    if (userOutlet && outletIdx !== -1 && String(row[outletIdx] || '') !== userOutlet) {
+      throw new Error("This purchase belongs to another outlet.");
+    }
 
-    Logger.log("Row " + rowIndex + " marked RECEIVED with rquantity=" + rquantity + " by " + authContext.username);
+    // One write covering both cells (they are normally adjacent columns).
+    const lo = Math.min(pstatusIdx, rqtyIdx);
+    const hi = Math.max(pstatusIdx, rqtyIdx);
+    row[pstatusIdx] = "RECEIVED";
+    row[rqtyIdx] = rquantity;
+    if (hi - lo <= 1) {
+      sheet.getRange(rowIndex, lo + 1, 1, hi - lo + 1).setValues([row.slice(lo, hi + 1)]);
+    } else {
+      sheet.getRange(rowIndex, pstatusIdx + 1).setValue("RECEIVED");
+      sheet.getRange(rowIndex, rqtyIdx + 1).setValue(rquantity);
+    }
+
+    Logger.log("Row " + rowIndex + " marked RECEIVED with rquantity=" + rquantity + " by " + session.username);
     return { success: true, message: "Marked as received." };
   } catch (e) {
     Logger.log("updateReceiveQuantitySecure error: " + e);

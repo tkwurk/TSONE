@@ -88,8 +88,10 @@ function app(options = {}) {
   context.formatDateForComparison = (date) => context.getAppDateKey_(date)
   context.Repo.adapter = {
     getValues(name) {
-      if (!(name in tables)) throw new Error('Unexpected collection: ' + name)
-      return tables[name]
+      const headerOnly = name.endsWith('!1:1')
+      const table = headerOnly ? name.slice(0, -4) : name
+      if (!(table in tables)) throw new Error('Unexpected collection: ' + name)
+      return headerOnly ? tables[table].slice(0, 1) : tables[table]
     },
     ensureTable(name, headers) {
       if (!tables[name].length) tables[name] = [Array.from(headers)]

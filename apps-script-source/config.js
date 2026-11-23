@@ -5,7 +5,8 @@ function resolveSpreadsheetId_() {
     var active = SpreadsheetApp.getActiveSpreadsheet();
     if (active) {
       var id = active.getId();
-      props.setProperty('SPREADSHEET_ID', id);
+      // This runs at the start of EVERY execution: only write when it changed.
+      if (props.getProperty('SPREADSHEET_ID') !== id) props.setProperty('SPREADSHEET_ID', id);
       return id;
     }
   } catch (e) {

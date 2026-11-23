@@ -427,6 +427,41 @@ function appendRowsAtomic_(sheet, rows) {
   sheet.getRange(startRow, 1, rows.length, width).setValues(rows);
 }
 
+/**
+ * Write edits made in memory back to the sheet with as few calls as possible
+ * (instead of one setValue per cell). `data` is the 2D array from
+ * getDataRange().getValues(), so data[i] is sheet row i + 1.
+ * @param {number[]} rowIdxs indexes into `data` that were changed
+ * @param {number[]} colIdxs 0-based columns that were changed
+ * Consecutive rows are written as one block; contiguous columns as one span.
+ */
+function writeRowsBack_(sheet, data, rowIdxs, colIdxs) {
+  function uniqSorted(list) {
+    var seen = {};
+    return list.filter(function (n) {
+      if (n < 0 || seen[n]) return false;
+      seen[n] = true;
+      return true;
+    }).sort(function (a, b) { return a - b; });
+  }
+  var rows = uniqSorted(rowIdxs || []);
+  var cols = uniqSorted(colIdxs || []);
+  if (!sheet || !rows.length || !cols.length) return;
+  var spans = (cols[cols.length - 1] - cols[0] === cols.length - 1)
+    ? [[cols[0], cols.length]]
+    : cols.map(function (c) { return [c, 1]; });
+  for (var i = 0; i < rows.length;) {
+    var j = i;
+    while (j + 1 < rows.length && rows[j + 1] === rows[j] + 1) j++;
+    var block = rows.slice(i, j + 1);
+    spans.forEach(function (sp) {
+      sheet.getRange(block[0] + 1, sp[0] + 1, block.length, sp[1])
+        .setValues(block.map(function (r) { return data[r].slice(sp[0], sp[0] + sp[1]); }));
+    });
+    i = j + 1;
+  }
+}
+
 function buildIdempotencyCacheKey_(prefix, clientRequestId) {
   var id = (clientRequestId || '').toString().trim();
   if (!id) return '';

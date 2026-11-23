@@ -3,21 +3,11 @@ function ensureDepositsSheetHeaders() {
   if (!sheet) {
     throw new Error("Deposits sheet not found.");
   }
-  
-  // Check if headers exist
+  // Runs on every save: only add headers to an empty sheet. (It used to also read
+  // and compare the header row just to log a mismatch — a wasted round trip.)
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(SHEET_HEADER_ROWS.DEPOSITS);
     Logger.log("Added headers to Deposits sheet: " + SHEET_HEADER_ROWS.DEPOSITS.join(", "));
-  } else {
-    const existingHeaders = sheet.getRange(1, 1, 1, SHEET_HEADER_ROWS.DEPOSITS.length).getValues()[0];
-    const expectedHeaders = SHEET_HEADER_ROWS.DEPOSITS;
-    
-    // If headers don't match, log the discrepancy
-    if (JSON.stringify(existingHeaders) !== JSON.stringify(expectedHeaders)) {
-      Logger.log("Deposits sheet headers mismatch:");
-      Logger.log("Existing: " + JSON.stringify(existingHeaders));
-      Logger.log("Expected: " + JSON.stringify(expectedHeaders));
-    }
   }
 }
 
@@ -78,7 +68,11 @@ function recordDeposit(deposit) {
       return apiFail('Device ID and username are required to record a deposit.', 'DEPOSIT_AUTH_REQUIRED');
     }
 
-    const session = getUserSessionEnhanced(deviceId, username) || {};
+    // Refuse without a valid session (it used to save with a blank user/outlet).
+    const session = getUserSessionEnhanced(deviceId, username);
+    if (!session || !session.username) {
+      return apiFail('Invalid or expired session', 'DEPOSIT_SESSION_INVALID');
+    }
     var timestamp = new Date();
 
     var row = [
@@ -214,6 +208,11 @@ function recordDepositSecure(params) {
 
     if (!authContext || !authContext.username || !authContext.outlet) {
       return apiFail('Authentication required: Missing username or outlet information', 'DEPOSIT_AUTH_INVALID');
+    }
+    try {
+      requirePermission_(params, 'deposits');
+    } catch (authErr) {
+      return apiFail(authErr.message || String(authErr), 'DEPOSIT_FORBIDDEN');
     }
 
     const depositWithAuth = {

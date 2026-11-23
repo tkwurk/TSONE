@@ -12,12 +12,13 @@ function pnlCacheKey_(outlet, year) {
 /** Clear P&L cache after financial writes (orders, purchases, expenses). */
 function invalidatePnLCache_(outlet) {
   try {
-    var cache = CacheService.getScriptCache();
     var y = new Date().getFullYear();
+    var keys = [];
     for (var i = 0; i < 5; i++) {
-      cache.remove(pnlCacheKey_(outlet, y - i));
-      cache.remove(pnlCacheKey_(null, y - i));
+      keys.push(pnlCacheKey_(outlet, y - i), pnlCacheKey_(null, y - i));
     }
+    // One cache call instead of ten (runs on every order/purchase/expense save).
+    CacheService.getScriptCache().removeAll(keys);
   } catch (e) {
     Logger.log('invalidatePnLCache_ failed: ' + e);
   }

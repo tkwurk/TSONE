@@ -86,14 +86,18 @@ function _ensureSheetColumn(sheet, colName) {
   sheet.getRange(1, col).setValue(colName);
 }
 
-function _appendRowByHeaders(sheet, idx, valuesByHeader) {
-  var numCols = sheet.getLastColumn();
+/** Build one row of `numCols` cells, placing values by header key. */
+function _rowByHeaders_(numCols, idx, valuesByHeader) {
   var row = new Array(numCols);
   for (var i = 0; i < numCols; i++) row[i] = '';
   Object.keys(valuesByHeader).forEach(function(key) {
     if (idx[key] !== undefined) row[idx[key]] = valuesByHeader[key];
   });
-  sheet.appendRow(row);
+  return row;
+}
+
+function _appendRowByHeaders(sheet, idx, valuesByHeader) {
+  sheet.appendRow(_rowByHeaders_(sheet.getLastColumn(), idx, valuesByHeader));
 }
 
 // ─────────────────────────────────────────
@@ -650,8 +654,12 @@ function submitChecklistResponses(payloadStr, deviceId, username) {
     var now = formatTimestampForSheet(new Date());
     var deviceInfo = payload.deviceInfo || '';
 
+    // Build every answer row first, then write them in ONE call (it used to be
+    // one appendRow + getLastColumn per question).
+    var numCols = respSheet.getLastColumn();
+    var newRows = [];
     (payload.responses || []).forEach(function(item) {
-      _appendRowByHeaders(respSheet, rIdx, {
+      newRows.push(_rowByHeaders_(numCols, rIdx, {
         DATETIME: now,
         FILLEDBY: session.username,
         CHECKLISTID: checklistId,
@@ -665,8 +673,9 @@ function submitChecklistResponses(payloadStr, deviceId, username) {
         REVIEWEDDATE: '',
         ATTACHMENTLINK: item.attachmentLink || '',
         DEVICEINFO: deviceInfo
-      });
+      }));
     });
+    appendRowsAtomic_(respSheet, newRows);
 
     return { success: true, shiftId: shiftId, checklistId: checklistId, count: (payload.responses || []).length };
   } catch (e) {
@@ -700,6 +709,7 @@ function reviewChecklistShift(payloadStr, deviceId, username) {
     var idx   = _crHeaders(sheet);
     var now   = formatTimestampForSheet(new Date());
     var updated = 0;
+    var changedRows = [];
 
     for (var r = 1; r < data.length; r++) {
       var rowShift  = (data[r][idx['SHIFTID']] || '').toString();
@@ -708,13 +718,15 @@ function reviewChecklistShift(payloadStr, deviceId, username) {
         ? (data[r][idx['CHECKLISTID']] || CHECKLIST_DEFAULT_ID).toString().trim()
         : CHECKLIST_DEFAULT_ID;
       if (rowShift === shiftId && rowOutlet === outlet && rowCid === checklistId) {
-        var sheetRow = r + 1;
-        sheet.getRange(sheetRow, idx['STATUS']       + 1).setValue('Reviewed');
-        sheet.getRange(sheetRow, idx['REVIEWEDBY']   + 1).setValue(session.username);
-        sheet.getRange(sheetRow, idx['REVIEWEDDATE'] + 1).setValue(now);
+        data[r][idx['STATUS']] = 'Reviewed';
+        data[r][idx['REVIEWEDBY']] = session.username;
+        data[r][idx['REVIEWEDDATE']] = now;
+        changedRows.push(r);
         updated++;
       }
     }
+    // A shift's answers sit in consecutive rows: usually ONE write instead of 3 per answer.
+    writeRowsBack_(sheet, data, changedRows, [idx['STATUS'], idx['REVIEWEDBY'], idx['REVIEWEDDATE']]);
 
     if (updated === 0) throw new Error('No responses found for shift: ' + shiftId);
 

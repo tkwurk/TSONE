@@ -90,8 +90,11 @@ function requireAuth_(params) {
   if (session.active === false || session.active === 'N') {
     throw new Error('Account is inactive');
   }
-  if (typeof refreshSessionAuthFromPeople_ === 'function') {
-    session = refreshSessionAuthFromPeople_(username, session) || session;
+  // Role/tabs/outlet are refreshed from People inside getUserSessionEnhanced at most
+  // every SESSION_PEOPLE_REFRESH_MS (login.js). Re-reading the whole People sheet
+  // here on every request made each submission slower for no extra safety.
+  if (!session.outlet && typeof resolveUserOutlet_ === 'function') {
+    session.outlet = resolveUserOutlet_(username, session.outlet);
   }
   return session;
 }

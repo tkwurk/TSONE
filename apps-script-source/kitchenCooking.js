@@ -1010,11 +1010,8 @@ function submitCookingBatchSecure(params) {
       }
     }
 
-    if (typeof writeAuditLog_ === 'function') {
-      writeAuditLog_(session.username, 'COOKING_BATCH', cookingId, JSON.stringify({
-        lines: saved, start: startTime, end: endTime
-      }), outlet);
-    }
+    // No AuditLog row here: the batch (id, lines, times, user, outlet) is already
+    // the KitchenCooking record above; a second sheet write only slowed submit.
 
     _clearCookingStockCache_(outlet, startTime);
 
@@ -1274,9 +1271,7 @@ function requestCookMoreSecure(params) {
       vals[idx.UPDATEDAT] = nowStr;
       if (notes) vals[idx.NOTES] = notes;
       range.setValues([vals]);
-      if (typeof writeAuditLog_ === 'function') {
-        writeAuditLog_(session.username, 'COOK_REQUEST_UPDATE', vals[idx.REQUESTID], productCode, outlet);
-      }
+      // CookRequests row (UpdatedAt) is the record; no duplicate AuditLog write.
       return sanitizeForClient({
         success: true,
         requestId: vals[idx.REQUESTID],
@@ -1307,9 +1302,7 @@ function requestCookMoreSecure(params) {
     } else {
       sheet.appendRow(row);
     }
-    if (typeof writeAuditLog_ === 'function') {
-      writeAuditLog_(session.username, 'COOK_REQUEST_CREATE', requestId, productCode, outlet);
-    }
+    // CookRequests row (RequestedBy/CreatedAt) is the record; no duplicate AuditLog write.
     return sanitizeForClient({ success: true, requestId: requestId, status: 'REQUESTED', updated: false });
   } catch (e) {
     Logger.log('requestCookMoreSecure error: ' + e.toString());
@@ -1393,16 +1386,13 @@ function updateCookRequestStatusSecure(params) {
     var data = _readSheetAllRows_(sheet);
     for (var r = 1; r < data.length; r++) {
       if ((data[r][idx.REQUESTID] || '').toString().trim() === requestId) {
-        var sheetRow = r + 1;
-        var range = sheet.getRange(sheetRow, 1, 1, sheet.getLastColumn());
-        var vals = range.getValues()[0];
+        // data[r] was just read (same width as the sheet), so no second row read.
+        var vals = data[r].slice();
         vals[idx.STATUS] = newStatus;
         vals[idx.UPDATEDAT] = formatTimestampForSheet(new Date());
         vals[idx.HANDLEDBY] = session.username;
-        range.setValues([vals]);
-        if (typeof writeAuditLog_ === 'function') {
-          writeAuditLog_(session.username, 'COOK_REQUEST_' + newStatus, requestId, vals[idx.PRODUCTCODE], vals[idx.OUTLET]);
-        }
+        sheet.getRange(r + 1, 1, 1, vals.length).setValues([vals]);
+        // CookRequests row (Status/HandledBy/UpdatedAt) is the record; no duplicate AuditLog write.
         return sanitizeForClient({ success: true, requestId: requestId, status: newStatus });
       }
     }
@@ -1457,8 +1447,8 @@ function _resolveCookRequestsAfterBatch_(outlet, productCodes, username, product
 
     var item = byCode[code];
     var aboveThreshold = !item || !item.needsRecook; // unknown product → treat as satisfied (legacy behaviour)
-    var range = sheet.getRange(r + 1, 1, 1, sheet.getLastColumn());
-    var vals = range.getValues()[0];
+    // data[r] was just read (same width as the sheet): write it back, no re-read.
+    var vals = row.slice();
     if (item && idx.REMAINING !== undefined) vals[idx.REMAINING] = item.remaining;
     if (item && idx.SEVERITY !== undefined) vals[idx.SEVERITY] = item.stockStatus || '';
     vals[idx.UPDATEDAT] = nowStr;
@@ -1470,7 +1460,7 @@ function _resolveCookRequestsAfterBatch_(outlet, productCodes, username, product
       vals[idx.STATUS] = 'COOKING';
       result.stillOpen.push({ productCode: code, remaining: item.remaining, threshold: item.recookThreshold });
     }
-    range.setValues([vals]);
+    sheet.getRange(r + 1, 1, 1, vals.length).setValues([vals]);
   }
   return result;
 }

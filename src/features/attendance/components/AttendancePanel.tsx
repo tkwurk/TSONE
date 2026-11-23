@@ -27,7 +27,7 @@ export function AttendancePanel({ auth }: { auth: AuthContext }) {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [emps, day] = await Promise.all([fetchEmployees(auth), fetchAttendanceForDate(date)])
+    const [emps, day] = await Promise.all([fetchEmployees(auth), fetchAttendanceForDate(date, auth)])
     setLoading(false)
     setEmployees(emps)
     setRows(day)
@@ -50,7 +50,7 @@ export function AttendancePanel({ auth }: { auth: AuthContext }) {
       .filter((e) => sel[e.employee_id]?.on && !checkedIn.has(e.employee_id))
       .map((e) => ({ employee_id: e.employee_id, start_time: sel[e.employee_id].time, status: sel[e.employee_id].status }))
     if (!entries.length) return setMsg({ tone: 'error', text: t('att.noneSelected') })
-    const r = await recordMorning(date, auth.username, entries)
+    const r = await recordMorning(date, auth.username, entries, auth)
     if (r.ok) {
       setMsg({ tone: 'info', text: `${t('att.recorded')}: ${r.data?.recorded ?? entries.length}` })
       load()
@@ -62,7 +62,7 @@ export function AttendancePanel({ auth }: { auth: AuthContext }) {
       .filter((r) => sel[r.employee_id]?.on)
       .map((r) => ({ employee_id: r.employee_id, end_time: sel[r.employee_id].time, status: sel[r.employee_id].status }))
     if (!entries.length) return setMsg({ tone: 'error', text: t('att.noneSelected') })
-    const r = await recordEvening(date, auth.username, entries)
+    const r = await recordEvening(date, auth.username, entries, auth)
     if (r.ok) {
       setMsg({ tone: 'info', text: `${t('att.updated')}: ${r.data?.updated ?? entries.length}` })
       load()
@@ -71,7 +71,7 @@ export function AttendancePanel({ auth }: { auth: AuthContext }) {
 
   const loadSummary = async () => {
     setLoading(true)
-    setSummary(await fetchAttendanceSummary(rangeStart, rangeEnd))
+    setSummary(await fetchAttendanceSummary(rangeStart, rangeEnd, auth))
     setLoading(false)
   }
 

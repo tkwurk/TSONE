@@ -18,8 +18,9 @@ var WorkflowLog = {
   record: function (requestId, eventType, step, status, ctx) {
     var c = ctx || {};
     try { Logger.log('[WORKFLOW] ' + requestId + ' | ' + eventType + ' | ' + step + ' | ' + status); } catch (e) { /* ignore */ }
-    // Each sheet append is a slow round trip; skip routine step START/OK entries.
-    if (step !== 'pipeline' && (status === 'START' || status === 'OK')) return;
+    // Each sheet append is a slow round trip on the request path: only failures and
+    // anomalies go to the sheet. Routine START/OK/DONE traces stay in Logger above.
+    if (status === 'START' || status === 'OK' || status === 'DONE') return;
     try {
       var ss = getGlobalSpreadsheet();
       if (!ss) return;

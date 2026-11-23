@@ -3,21 +3,11 @@ function ensureExpensesSheetHeaders() {
   if (!sheet) {
     throw new Error("Expenses sheet not found.");
   }
-  
-  // Check if headers exist
+  // Runs on every save: only add headers to an empty sheet. (It used to also read
+  // and compare the header row just to log a mismatch — a wasted round trip.)
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(SHEET_HEADER_ROWS.EXPENSES);
     Logger.log("Added headers to Expenses sheet: " + SHEET_HEADER_ROWS.EXPENSES.join(", "));
-  } else {
-    const existingHeaders = sheet.getRange(1, 1, 1, SHEET_HEADER_ROWS.EXPENSES.length).getValues()[0];
-    const expectedHeaders = SHEET_HEADER_ROWS.EXPENSES;
-    
-    // If headers don't match, log the discrepancy
-    if (JSON.stringify(existingHeaders) !== JSON.stringify(expectedHeaders)) {
-      Logger.log("Expenses sheet headers mismatch:");
-      Logger.log("Existing: " + JSON.stringify(existingHeaders));
-      Logger.log("Expected: " + JSON.stringify(expectedHeaders));
-    }
   }
 }
 
@@ -44,7 +34,11 @@ function recordExpense(expense) {
       return apiFail('Device ID and username are required to record an expense.', 'EXPENSE_AUTH_REQUIRED');
     }
 
-    const session = getUserSessionEnhanced(deviceId, username) || {};
+    // Refuse without a valid session (it used to save with a blank user/outlet).
+    const session = getUserSessionEnhanced(deviceId, username);
+    if (!session || !session.username) {
+      return apiFail('Invalid or expired session', 'EXPENSE_SESSION_INVALID');
+    }
     const timestamp = new Date();
 
     const row = [
@@ -369,6 +363,12 @@ function recordExpenseSecure(params) {
     var authContext = params._authContext;
     if (!authContext || !authContext.deviceId || !authContext.username) {
       return apiFail('Invalid authentication context', 'EXPENSE_AUTH_INVALID');
+    }
+    // Only the checkout (discount) records expenses from the app.
+    try {
+      requirePermission_(params, 'orders');
+    } catch (authErr) {
+      return apiFail(authErr.message || String(authErr), 'EXPENSE_FORBIDDEN');
     }
 
     var expense = {

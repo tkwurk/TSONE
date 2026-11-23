@@ -1,5 +1,13 @@
 // ===== ATTENDANCE MODULE =====
 
+/**
+ * Every attendance read/write needs a valid session with the "attendance" tab.
+ * (These were callable over the API with no sign-in check at all.)
+ */
+function requireAttendanceAccess_(deviceId, username) {
+  return requirePermission_({ _authContext: { deviceId: deviceId, username: username } }, 'attendance');
+}
+
 function ensureAttendanceSheetHeaders() {
   var sheet = getGlobalSpreadsheet().getSheetByName(SHEETS.ATTENDANCE);
   if (!sheet) {
@@ -58,7 +66,8 @@ function getEmployeeList(deviceId, username) {
  * Record morning attendance (start time) for multiple employees
  * @param {string|Object} payload - JSON with supervisor, date, entries[]
  */
-function recordMorningAttendance(payload) {
+function recordMorningAttendance(payload, deviceId, username) {
+  requireAttendanceAccess_(deviceId, username);
   if (typeof payload === 'string') payload = JSON.parse(payload);
 
   var sheet = getGlobalSpreadsheet().getSheetByName(SHEETS.ATTENDANCE);
@@ -83,6 +92,7 @@ function recordMorningAttendance(payload) {
     }
   }
 
+  var newRows = [];
   for (var i = 0; i < entries.length; i++) {
     var entry = entries[i];
     if (existingSet[entry.employee_id]) {
@@ -90,7 +100,7 @@ function recordMorningAttendance(payload) {
       continue; // already recorded for this date
     }
     var attendanceId = 'ATT-' + new Date().getTime() + '-' + i;
-    sheet.appendRow([
+    newRows.push([
       attendanceId,
       entry.employee_id,
       dateStr,
@@ -102,6 +112,8 @@ function recordMorningAttendance(payload) {
     existingSet[entry.employee_id] = true; // prevent duplicates within same batch
     recorded++;
   }
+  // One write for the whole team instead of one appendRow per employee.
+  appendRowsAtomic_(sheet, newRows);
 
   Logger.log("Recorded morning attendance for " + recorded + " employees, skipped " + skipped + " duplicates");
   return { success: true, recorded: recorded, skipped: skipped };
@@ -111,7 +123,8 @@ function recordMorningAttendance(payload) {
  * Record evening attendance (end time) - updates existing morning rows
  * @param {string|Object} payload - JSON with supervisor, date, entries[]
  */
-function recordEveningAttendance(payload) {
+function recordEveningAttendance(payload, deviceId, username) {
+  requireAttendanceAccess_(deviceId, username);
   if (typeof payload === 'string') payload = JSON.parse(payload);
 
   var sheet = getGlobalSpreadsheet().getSheetByName(SHEETS.ATTENDANCE);
@@ -130,6 +143,8 @@ function recordEveningAttendance(payload) {
   var dateStr = payload.date;
   var entries = payload.entries || [];
   var updated = 0;
+  var changedRows = [];
+  var changedCols = [endCol, hoursCol];
 
   for (var e = 0; e < entries.length; e++) {
     var entry = entries[e];
@@ -140,24 +155,21 @@ function recordEveningAttendance(payload) {
       var rowEnd = (data[r][endCol] || '').toString().trim();
 
       if (rowEmpId === entry.employee_id && rowDate === dateStr && rowEnd === '') {
-        // Found the morning row without end_time - update it
-        var sheetRow = r + 1; // 1-indexed
-
-        sheet.getRange(sheetRow, endCol + 1).setValue(entry.end_time);
-
-        // Calculate work hours
-        var workHours = calculateWorkHours(data[r][startCol], entry.end_time);
-        sheet.getRange(sheetRow, hoursCol + 1).setValue(workHours);
-
+        // Found the morning row without end_time - update it in memory
+        data[r][endCol] = entry.end_time;
+        data[r][hoursCol] = calculateWorkHours(data[r][startCol], entry.end_time);
         if (entry.status) {
-          sheet.getRange(sheetRow, statusCol + 1).setValue(entry.status);
+          data[r][statusCol] = entry.status;
+          changedCols.push(statusCol);
         }
-
+        changedRows.push(r);
         updated++;
         break;
       }
     }
   }
+  // One write per employee row (end/hours/status together), not 2–3 per employee.
+  writeRowsBack_(sheet, data, changedRows, changedCols);
 
   Logger.log("Updated evening attendance for " + updated + " employees");
   return { success: true, updated: updated };
@@ -166,7 +178,8 @@ function recordEveningAttendance(payload) {
 /**
  * Get today's attendance records for a given date
  */
-function getAttendanceForDate(dateStr) {
+function getAttendanceForDate(dateStr, deviceId, username) {
+  requireAttendanceAccess_(deviceId, username);
   var sheet = getGlobalSpreadsheet().getSheetByName(SHEETS.ATTENDANCE);
   if (!sheet || sheet.getLastRow() <= 1) return [];
 
@@ -199,7 +212,8 @@ function getAttendanceForDate(dateStr) {
 /**
  * Get attendance summary for a date range
  */
-function getAttendanceSummary(startDate, endDate) {
+function getAttendanceSummary(startDate, endDate, deviceId, username) {
+  requireAttendanceAccess_(deviceId, username);
   var sheet = getGlobalSpreadsheet().getSheetByName(SHEETS.ATTENDANCE);
   if (!sheet || sheet.getLastRow() <= 1) return [];
 

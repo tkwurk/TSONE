@@ -47,6 +47,13 @@ var SpreadsheetAppAdapter = {
     return sheet.getDataRange().getValues();
   },
 
+  /** Header row only, same width as getDataRange() (1 row, no data scan). */
+  getHeaders: function (name) {
+    var sheet = this._sheet(name);
+    if (!sheet || sheet.getLastRow() === 0) return [];
+    return sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  },
+
   getValuesFromEnd: function (name, offset, count, anchorTotalRows) {
     var sheet = this._sheet(name);
     if (!sheet || sheet.getLastRow() === 0) {
