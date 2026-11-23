@@ -64,7 +64,7 @@ function App() {
     return (
       <main className="app">
         <header className="app__header">
-          <h1>TS4</h1>
+          <h1>TSONE</h1>
           <p className="subtitle">{t('app.subtitle')}</p>
           <LanguageToggle />
         </header>
@@ -126,7 +126,7 @@ function App() {
         >
           ☰
         </button>
-        <h1 className="topbar__logo">TS4</h1>
+        <h1 className="topbar__logo">TSONE</h1>
         <div className="actions">
           <span className="status">
             {session.username}

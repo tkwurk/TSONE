@@ -29,8 +29,8 @@ export default defineConfig({
       injectRegister: 'auto',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: 'TS4 — Point of Sale',
-        short_name: 'TS4',
+        name: 'TSONE — Point of Sale',
+        short_name: 'TSONE',
         description: 'Point of sale app backed by Google Sheets via Apps Script.',
         theme_color: '#aa3bff',
         background_color: '#16171d',

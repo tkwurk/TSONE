@@ -6,7 +6,7 @@
  * status so opening the Web App URL in a browser doesn't error.
  */
 function doGet(e) {
-  var body = 'TS4 API is running. Use POST /exec with { eventType, payload, ctx }.';
+  var body = 'TSONE API is running. Use POST /exec with { eventType, payload, ctx }.';
   if (!initializeSpreadsheet()) {
     var detail = getLastSpreadsheetInitError_();
     body = 'Error: Could not initialize spreadsheet' + (detail ? '\n\n' + detail : '');
