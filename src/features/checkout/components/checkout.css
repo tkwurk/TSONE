@@ -156,7 +156,9 @@
   background: var(--bg);
   transition:
     flex-basis 0.2s ease,
-    opacity 0.2s ease;
+    opacity 0.2s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .pos__cart--wide {
@@ -363,6 +365,14 @@
   }
 }
 
+/* When the cart is scrolled into view on open, keep its heading clear of the
+   sticky top bar used on phones/tablets. */
+@media (max-width: 767px), (pointer: coarse) {
+  .pos__cart {
+    scroll-margin-top: 4.5rem;
+  }
+}
+
 .menu-section {
   margin-top: 1rem;
 }
@@ -521,4 +531,18 @@
   min-width: 1.5rem;
   text-align: center;
   font-weight: 600;
+}
+
+/* The cart panel is focused programmatically (dialog focus target), so no
+   default outline on the panel itself... */
+.pos__cart:focus {
+  outline: none;
+}
+
+/* ...instead, while focus is anywhere inside the open cart, highlight the whole
+   panel. Browsers hide focus rings after a mouse click or tap, so without this
+   there was no visible sign the cart had focus on tablet/desktop layouts. */
+.pos__cart:not(.pos__cart--collapsed):focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg), 0 0 0 1px var(--accent-border);
 }

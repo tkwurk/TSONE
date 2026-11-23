@@ -4,6 +4,7 @@ import { Badge, Button, Notice, Panel } from '@/components/ui'
 import { fetchProducts, productName, type ProductRow } from '@/features/catalog'
 import type { Session } from '@/features/auth'
 import { useI18n } from '@/i18n'
+import { useDialogFocus } from '@/hooks/useDialogFocus'
 import { useCart } from '../hooks/useCart'
 import { useParkedOrders } from '../hooks/useParkedOrders'
 import { useLastReceipt } from '../hooks/useLastReceipt'
@@ -58,6 +59,15 @@ export function CheckoutPanel({ session }: { session: Session }) {
   const [showReceipt, setShowReceipt] = useState(false)
   const [autoPrint, setAutoPrint] = useState(() => isAutoPrintEnabled(session.outlet))
   const [submitting, setSubmitting] = useState(false)
+
+  // Cart panel = dialog: focus moves in on open, Tab is trapped, Esc closes,
+  // focus returns to the 🛒 trigger. Not closable mid-submit.
+  const cartRef = useRef<HTMLElement>(null)
+  const cartTriggerRef = useRef<HTMLButtonElement>(null)
+  const closeCart = useCallback(() => {
+    if (!submitting) setCartOpen(false)
+  }, [submitting])
+  useDialogFocus(cartOpen, cartRef, { onClose: closeCart, returnFocusRef: cartTriggerRef })
   const [message, setMessage] = useState<Msg | null>(null)
   const [recookOpen, setRecookOpen] = useState(false)
   const [customName, setCustomName] = useState('')
@@ -286,10 +296,14 @@ export function CheckoutPanel({ session }: { session: Session }) {
               {drawer.phase === 'done' ? '✅' : '🗄️'}
             </button>
             <button
+              ref={cartTriggerRef}
               type="button"
               className="cart-toggle"
               onClick={() => setCartOpen((o) => !o)}
               aria-expanded={cartOpen}
+              aria-controls="pos-cart"
+              aria-haspopup="dialog"
+              aria-label={`${t('checkout.cart')} (${cart.count})`}
             >
               🛒 <Badge tone={cart.count ? 'ok' : 'neutral'}>{cart.count}</Badge>
             </button>
@@ -470,7 +484,17 @@ export function CheckoutPanel({ session }: { session: Session }) {
         </div>
 
         {/* ── Right: collapsible cart / payment step ── */}
-        <aside className={'pos__cart' + (cartOpen ? '' : ' pos__cart--collapsed') + (step === 'payment' ? ' pos__cart--wide' : '')}>
+        <aside
+          id="pos-cart"
+          ref={cartRef}
+          className={'pos__cart' + (cartOpen ? '' : ' pos__cart--collapsed') + (step === 'payment' ? ' pos__cart--wide' : '')}
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('checkout.cart')}
+          tabIndex={-1}
+          // Collapsed: out of the tab order and hidden from screen readers.
+          inert={!cartOpen}
+        >
           {step === 'payment' ? (
             <PaymentScreen
               items={cart.items}
@@ -487,7 +511,7 @@ export function CheckoutPanel({ session }: { session: Session }) {
             <h3>
               {t('checkout.cart')} ({cart.count})
             </h3>
-            <button type="button" className="cart-collapse" onClick={() => setCartOpen(false)} aria-label="Collapse">
+            <button type="button" className="cart-collapse" onClick={closeCart} aria-label={t('receipt.close')} data-dialog-initial>
               ›
             </button>
           </div>
