@@ -58,6 +58,7 @@
   right: 0;
   top: calc(100% + 8px);
   z-index: 50;
+  box-sizing: border-box;
   width: min(380px, calc(100vw - 1.5rem));
   max-height: min(70vh, 560px);
   overflow: auto;
@@ -213,5 +214,18 @@
       opacity: 0;
       transform: translateY(8px);
     }
+  }
+}
+
+/* Phones: the bell sits mid-way across the top bar, so a panel anchored to it
+   would run off the left edge. Span the screen just below the top bar instead. */
+@media (max-width: 640px) {
+  .notify__panel {
+    position: fixed;
+    left: 0.75rem;
+    right: 0.75rem;
+    top: calc(4rem + env(safe-area-inset-top));
+    width: auto;
+    max-height: calc(100dvh - 5rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   }
 }

@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
@@ -51,7 +52,10 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // Resolve from the project root Vite uses (process.cwd()), not this file's URL:
+      // on Windows the two can differ in drive-letter case ("c:" vs "C:"), which made
+      // `@/…` and relative imports load two copies of a module (e.g. the i18n context).
+      '@': resolve(process.cwd(), 'src'),
     },
   },
 })
