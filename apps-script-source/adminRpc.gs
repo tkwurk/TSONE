@@ -51,20 +51,15 @@ function _cookAlertTriggerInstalled_() {
 
 function getCookingAlertStatusSecure(params) {
   try {
-    requireAdmin_(params);
-    var recipients = null;
-    try {
-      var r = _cookingAlertRecipients_((params._authContext && params._authContext.outlet) || '');
-      recipients = r && r.to ? r.to : (Array.isArray(r) ? r : null);
-    } catch (e) { /* optional */ }
-    var quota = null;
-    try { quota = MailApp.getRemainingDailyQuota(); } catch (e) { /* optional */ }
+    var session = requireAdmin_(params);
+    var push = { configured: false, devices: 0 };
+    try { push = NotificationWorker.deviceSummary(session.outlet || ''); } catch (e) { /* optional */ }
     return apiOk({
       installed: _cookAlertTriggerInstalled_(),
       sweepMinutes: COOK_ALERT_SWEEP_MINUTES,
       reminderMinutes: Math.round(COOK_ALERT_REMINDER_MS / 60000),
-      recipients: recipients,
-      mailQuotaRemaining: quota
+      pushConfigured: push.configured,
+      pushDevices: push.devices
     }, 'COOK_ALERT_STATUS');
   } catch (e) {
     return apiFail(e.message || e, 'COOK_ALERT_STATUS_FAILED');
@@ -91,14 +86,12 @@ function removeCookingAlertTriggerSecure(params) {
   }
 }
 
-/** Run one sweep immediately (creates/refreshes cook requests and emails recipients). */
+/** Run one sweep immediately (creates/refreshes cook requests and pushes to kitchen devices). */
 function runCookingAlertSweepNowSecure(params) {
   try {
     requireAdmin_(params);
     var summary = runCookingStockAlertSweep() || {};
-    var quota = null;
-    try { quota = MailApp.getRemainingDailyQuota(); } catch (e) { /* optional */ }
-    return apiOk({ ran: true, summary: summary, mailQuotaRemaining: quota }, 'COOK_ALERT_SWEPT');
+    return apiOk({ ran: true, summary: summary }, 'COOK_ALERT_SWEPT');
   } catch (e) {
     return apiFail(e.message || e, 'COOK_ALERT_SWEEP_FAILED');
   }

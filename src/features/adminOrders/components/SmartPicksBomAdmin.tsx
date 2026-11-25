@@ -74,8 +74,6 @@ export function CookAlertsAdmin({ auth }: { auth: AuthContext }) {
     } else setMsg({ tone: 'error', text: r.error ?? '' })
   }
 
-  const quota = sweep?.mailQuotaRemaining ?? status?.mailQuotaRemaining
-
   return (
     <Panel title={`🔔 ${t('adm.cookAlerts')}`}>
       {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
@@ -86,15 +84,17 @@ export function CookAlertsAdmin({ auth }: { auth: AuthContext }) {
             { label: t('adm.alertTrigger'), value: status.installed ? t('adm.active') : t('adm.inactive'), tone: status.installed ? 'ok' : 'bad' },
             { label: t('adm.sweepEvery'), value: `${status.sweepMinutes ?? 5} min` },
             { label: t('adm.remindEvery'), value: `${status.reminderMinutes ?? 30} min` },
-            { label: t('adm.recipients'), value: status.recipients?.length ?? 0 },
-            { label: t('adm.mailQuota'), value: quota == null ? '—' : String(quota), tone: quota === 0 ? 'bad' : 'ok' },
+            {
+              label: t('adm.pushDevices'),
+              value: status.pushConfigured ? String(status.pushDevices ?? 0) : t('adm.pushOff'),
+              tone: status.pushConfigured && (status.pushDevices ?? 0) > 0 ? 'ok' : 'bad',
+            },
           ]}
         />
       )}
       {status && !status.installed && <Notice tone="warn">{t('adm.cookAlertsOff')}</Notice>}
-      {quota === 0 && <Notice tone="warn">{t('adm.mailQuotaOut')}</Notice>}
-      {status && status.recipients && status.recipients.length === 0 && <Notice tone="warn">{t('adm.noRecipients')}</Notice>}
-      {status?.recipients && status.recipients.length > 0 && <p className="muted">{status.recipients.join(', ')}</p>}
+      {status && !status.pushConfigured && <Notice tone="warn">{t('adm.pushNotConfigured')}</Notice>}
+      {status?.pushConfigured && !status.pushDevices && <Notice tone="warn">{t('adm.noPushDevices')}</Notice>}
       <div className="actions">
         {status?.installed ? (
           <Button variant="ghost" disabled={busy} onClick={() => act(() => removeCookAlerts(auth), t('adm.triggerRemoved'))}>
@@ -122,12 +122,13 @@ export function CookAlertsAdmin({ auth }: { auth: AuthContext }) {
               { key: 'created', label: t('adm.requestsCreated'), align: 'right' },
               { key: 'updated', label: t('adm.requestsUpdated'), align: 'right' },
               {
-                key: 'mail',
-                label: 'Email',
+                key: 'push',
+                label: t('adm.pushSent'),
+                align: 'right',
                 render: (r) => (
                   <>
-                    <Badge tone={String(r.mail).includes('sent') ? 'ok' : r.mail === 'none' ? 'neutral' : 'bad'}>{String(r.mail)}</Badge>
-                    {r.mailError ? <div className="muted">{String(r.mailError)}</div> : null}
+                    <Badge tone={Number(r.push) > 0 ? 'ok' : r.pushNote ? 'bad' : 'neutral'}>{String(r.push ?? 0)}</Badge>
+                    {r.pushNote ? <div className="muted">{String(r.pushNote)}</div> : null}
                   </>
                 ),
               },

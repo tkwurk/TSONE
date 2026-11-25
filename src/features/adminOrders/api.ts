@@ -89,13 +89,15 @@ export const fetchStockHistoryJobInfo = (auth: AuthContext) =>
 export const scheduleStockHistoryJob = (hour: number, auth: AuthContext) =>
   api.scheduleStockHistory<{ message?: string }>(hour, auth)
 
-// ---------- Cooking stock alerts (auto cook requests + emails) ----------
+// ---------- Cooking stock alerts (auto cook requests + push notifications) ----------
 export interface CookAlertStatus {
   installed?: boolean
   sweepMinutes?: number
   reminderMinutes?: number
-  recipients?: string[] | null
-  mailQuotaRemaining?: number | null
+  /** FIREBASE_SERVICE_ACCOUNT is set on this outlet. */
+  pushConfigured?: boolean
+  /** Devices of this outlet registered for push. */
+  pushDevices?: number
 }
 export interface SweepOutletResult {
   outlet: string
@@ -103,13 +105,13 @@ export interface SweepOutletResult {
   below: number
   created: number
   updated: number
-  mail: string
-  recipients: number
-  mailError: string
+  /** Pushes delivered by this check. */
+  push: number
+  /** Why nothing was pushed (not-configured, no-devices) or the error. */
+  pushNote: string
 }
 export interface SweepResult {
   summary?: { outlets?: SweepOutletResult[]; errors?: { outlet: string; error: string }[] }
-  mailQuotaRemaining?: number | null
 }
 export const fetchCookAlertStatus = (auth: AuthContext) => callSecure<CookAlertStatus>('getCookingAlertStatusSecure', {}, auth)
 export const installCookAlerts = (auth: AuthContext) => callSecure('installCookingAlertTriggerSecure', {}, auth)

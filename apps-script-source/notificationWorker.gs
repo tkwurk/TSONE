@@ -126,6 +126,18 @@ var NotificationWorker = {
     return result;
   },
 
+  /** For admin status: is push set up, and how many devices of this outlet receive alerts. */
+  deviceSummary: function (outlet) {
+    var key = canonicalOutletKey_(outlet);
+    var seen = {};
+    Repo.readTable('PUSH_SUBSCRIPTIONS').rows.forEach(function (r) {
+      if (String(r['Active'] || '').toUpperCase() !== 'Y') return;
+      if (key && canonicalOutletKey_(String(r['Outlet'] || '')) !== key) return;
+      seen[String(r['Token'] || '')] = true;
+    });
+    return { configured: !!this._fcmConfig_(), devices: Object.keys(seen).filter(Boolean).length };
+  },
+
   // Copilot: Send a test notification to the caller's own device(s) so they can
   // check the whole push chain. Optional delay (max 15 s) lets them close the app first.
   sendTest: function (payload, ctx) {
