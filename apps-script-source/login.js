@@ -9,15 +9,20 @@ function validateLoginWithAllowedTabs(username, code) {
   return { success: false, message: 'People auth not available' };
 }
 
-/** Device ID suffix must match canonical username used in session keys. */
+/**
+ * Device ID used in session keys: <device base>_user_<username>.
+ * Deterministic: the same physical device + user always maps to the same ID,
+ * so logging in again (e.g. users taking turns on a shared till) overwrites
+ * one session instead of creating a new Script Property each time.
+ * The base is whatever the client sent, minus any previous user suffix.
+ */
 function ensureDeviceIdForUser_(deviceId, canonicalUsername) {
   var suffix = '_user_' + String(canonicalUsername || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-  if (deviceId && String(deviceId).endsWith(suffix)) {
-    return deviceId;
+  var base = String(deviceId || '').replace(/_user_[a-z0-9]*$/, '');
+  if (!/^[A-Za-z0-9_-]{8,100}$/.test(base)) {
+    base = 'device_' + new Date().getTime() + '_session_' + Math.floor(Math.random() * 1e15).toString(36);
   }
-  var ts = new Date().getTime();
-  var rand = Math.floor(Math.random() * 1e15).toString(36);
-  return 'device_' + ts + '_session_' + rand + suffix;
+  return base + suffix;
 }
 
 function login(username, outlet, allowedTabs, deviceId, role) {
@@ -40,26 +45,8 @@ function login(username, outlet, allowedTabs, deviceId, role) {
   const scriptProps = PropertiesService.getScriptProperties();
   const sessionKey = 'session_' + username + '_' + deviceId;
   scriptProps.setProperty(sessionKey, JSON.stringify(sessionData));
-  
-  // Also store a mapping from username to deviceId for easier lookups
-  const userDeviceKey = 'user_devices_' + username;
-  try {
-    const existingDevices = scriptProps.getProperty(userDeviceKey);
-    let deviceList = [];
-    if (existingDevices) {
-      deviceList = JSON.parse(existingDevices);
-    }
-    // Add this device if not already in the list
-    if (!deviceList.includes(deviceId)) {
-      deviceList.push(deviceId);
-      scriptProps.setProperty(userDeviceKey, JSON.stringify(deviceList));
-    }
-  } catch (error) {
-    Logger.log("Error updating user device list: " + error.toString());
-    // Set as new list if parsing failed
-    scriptProps.setProperty(userDeviceKey, JSON.stringify([deviceId]));
-  }
-  
+  // (No more user_devices_<username> list: nothing reads it and it only grew.)
+
   Logger.log("Login successful - Username: " + username + ", Outlet: " + outlet + ", DeviceId: " + deviceId);
   
   return true;
@@ -121,29 +108,66 @@ function clearUserSession(deviceId, username) {
 }
 
 // Clean up expired sessions (can be called periodically)
-function cleanupExpiredSessions() {
-  const scriptProps = PropertiesService.getScriptProperties();
-  const allProps = scriptProps.getProperties();
-  const now = new Date().getTime();
-  const maxAge = 24 * 60 * 60 * 1000; // 24 hours
-  
-  for (const key in allProps) {
-    if (key.startsWith('session_')) {
+var SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // same limit getUserSessionEnhanced enforces
+var SESSION_PURGE_EVERY_S = 60 * 60;           // automatic purge at most hourly
+
+/**
+ * Removes Script Properties that only old login code created:
+ *  - session_*        expired (idle > 24 h, already rejected on use) or unreadable
+ *  - user_devices_*   per-user device lists (no longer written or read)
+ *  - active_session_* per-user "resume" records (no longer written; app never resumes)
+ * Everything else (SPREADSHEET_ID, schedules, keys, …) is never touched.
+ * @param {{ max?: number, force?: boolean }} options  max deletions this run;
+ *   without force, runs at most once per SESSION_PURGE_EVERY_S.
+ * @return {{ checked: number, deleted: Object, remaining: number, skipped?: string }}
+ */
+function purgeStaleSessionProperties_(options) {
+  options = options || {};
+  var result = { checked: 0, deleted: { expiredSessions: 0, deviceLists: 0, activeSessions: 0 }, remaining: 0 };
+  var cache = CacheService.getScriptCache();
+  if (!options.force) {
+    if (cache.get('session_purge_ran')) { result.skipped = 'ran recently'; return result; }
+    cache.put('session_purge_ran', '1', SESSION_PURGE_EVERY_S);
+  }
+  var max = options.max || Infinity;
+  var props = PropertiesService.getScriptProperties();
+  var all = props.getProperties();
+  var now = Date.now();
+  var deletedTotal = 0;
+  Object.keys(all).forEach(function (key) {
+    var kind = null;
+    if (key.indexOf('user_devices_') === 0) kind = 'deviceLists';
+    else if (key.indexOf('active_session_') === 0) kind = 'activeSessions';
+    else if (key.indexOf('session_') === 0) {
+      result.checked++;
       try {
-        const sessionData = JSON.parse(allProps[key]);
-        const sessionAge = now - sessionData.lastActivity;
-        
-        if (sessionAge > maxAge) {
-          scriptProps.deleteProperty(key);
-          console.log('Cleaned up expired session:', key);
-        }
-      } catch (error) {
-        // Invalid session data, remove it
-        scriptProps.deleteProperty(key);
-        console.log('Cleaned up invalid session:', key);
+        var s = JSON.parse(all[key]);
+        if (!(now - Number(s.lastActivity) <= SESSION_MAX_AGE_MS)) kind = 'expiredSessions';
+      } catch (e) {
+        kind = 'expiredSessions';
       }
     }
-  }
+    if (!kind) return;
+    if (deletedTotal >= max) { result.remaining++; return; }
+    props.deleteProperty(key);
+    result.deleted[kind]++;
+    deletedTotal++;
+  });
+  return result;
+}
+
+/**
+ * Run from the Apps Script editor (Run ▸ cleanUpSessionProperties) to clear the
+ * backlog at once. Safe: signed-in users keep their sessions (see purge rules).
+ */
+function cleanUpSessionProperties() {
+  var before = Object.keys(PropertiesService.getScriptProperties().getProperties()).length;
+  var result = purgeStaleSessionProperties_({ force: true });
+  var after = Object.keys(PropertiesService.getScriptProperties().getProperties()).length;
+  result.before = before;
+  result.after = after;
+  Logger.log('cleanUpSessionProperties: ' + JSON.stringify(result));
+  return result;
 }
 
 // Debug function to check session state

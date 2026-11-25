@@ -74,22 +74,7 @@ function authenticateUserClean(username, password, deviceId) {
     );
     
     if (loginResult) {
-      try {
-        var scriptProps = PropertiesService.getScriptProperties();
-        scriptProps.setProperty('active_session_' + canonicalUsername, JSON.stringify({
-          deviceId: resolvedDeviceId,
-          username: canonicalUsername,
-          outlet: validation.outlet,
-          allowedTabs: normalizeAllowedTabsForRole_(validation.allowedTabs, validation.role),
-          role: validation.role || 'cashier',
-          loginTime: new Date().getTime(),
-          active: true
-        }));
-        Logger.log("Active session stored for: " + canonicalUsername + " deviceId: " + resolvedDeviceId);
-      } catch (e) {
-        Logger.log("Warning: Could not store active session: " + e.toString());
-      }
-
+      // (No more active_session_<username> record: only the unused resume path read it.)
       var verified = getUserSessionEnhanced(resolvedDeviceId, canonicalUsername);
       if (!verified) {
         Logger.log("CRITICAL: Session not readable after login for " + canonicalUsername);
@@ -117,6 +102,8 @@ function authenticateUserClean(username, password, deviceId) {
     }
     } finally {
       lock.releaseLock();
+      // Housekeeping outside the lock: at most hourly, a bounded number of deletions.
+      try { purgeStaleSessionProperties_({ max: 50 }); } catch (e) { Logger.log('session purge warning: ' + e); }
     }
     
   } catch (error) {
