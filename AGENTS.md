@@ -29,7 +29,13 @@ Data (Google Sheets today)            → swappable for Firestore / Postgres lat
   `SpreadsheetApp` (or raw sheet access) directly inside workers.
 - Web App is deployed **Execute as: the owner (me)**, so the script reaches the
   spreadsheet with the owner's access and **end users never get direct access to
-  the Sheet**. This requires no Google Cloud project and keeps the app free.
+  the Sheet**. The data path requires no Google Cloud project and keeps the app free.
+  **Approved exception (push only):** one free Firebase project is used for
+  Firebase Cloud Messaging push notifications — nothing else. Its service-account
+  key lives only in each outlet's Script Property `FIREBASE_SERVICE_ACCOUNT`; the
+  client gets only the public web config (`VITE_FIREBASE_CONFIG`,
+  `VITE_FIREBASE_VAPID_KEY`). Without them push is off and the app falls back to
+  in-app notifications while it is open.
   (Future option for per-user concurrency: deploy *execute as user accessing* and
   switch the data layer to the service-account adapter — see `SheetsAdapter` /
   `serviceAccount.gs`. Not active today.)
@@ -60,6 +66,8 @@ Data (Google Sheets today)            → swappable for Firestore / Postgres lat
 | Sales Worker | Checkout/transaction persistence (delegates to `saveOrderSecure`) | Stock, reporting, validation |
 | Inventory Worker | Stock ledger + restock | Sales pricing, reporting |
 | Reporting Worker | Report/summary generation | Writing transactional data |
+| Shift Worker | Shift handover reports (`ShiftReports`): expected vs counted cash, kitchen confirmation | Stock, sales, pricing |
+| Notification Worker | Push subscriptions (`PushSubscriptions`) and push delivery via FCM | Deciding business events; must never throw into the caller |
 | Reflection Agent | Validation, compliance, reconciliation | Mutating business data |
 | Error Handler | Logging, retry, alerting | Business decisions |
 
@@ -72,7 +80,9 @@ New capability = a new `eventType` routed by the Orchestrator to a Worker that
 calls `Repo`. Known events include `checkout.completed`, `stock.updated`,
 `stock.report.requested`, `stock.history.status.requested`,
 `stock.history.schedule.requested`, `consumption.closing.requested`,
-`consumption.recorded`, `consumption.history.requested`, `report.requested`, and `purchase.recorded`.
+`consumption.recorded`, `consumption.history.requested`, `shift.report.requested`, `shift.report.submitted`, `shift.history.requested`,
+`push.subscribed`, `push.unsubscribed`,
+`report.requested`, and `purchase.recorded`.
 Keep the `// Copilot:` intent comment above each worker method.
 
 ## Shared context object

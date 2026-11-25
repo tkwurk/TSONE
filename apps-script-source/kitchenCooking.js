@@ -1303,6 +1303,13 @@ function requestCookMoreSecure(params) {
       sheet.appendRow(row);
     }
     // CookRequests row (RequestedBy/CreatedAt) is the record; no duplicate AuditLog write.
+    // Push to the outlet's kitchen devices (never throws; skipped if push isn't set up).
+    if (typeof NotificationWorker !== 'undefined') {
+      NotificationWorker.notifyKitchenRequests(outlet, [{
+        requestId: requestId, productCode: productCode, productName: productName || productCode,
+        remaining: remaining, requestedQty: requestedQty, requestedBy: session.username, reminder: false
+      }], { excludeUsername: session.username });
+    }
     return sanitizeForClient({ success: true, requestId: requestId, status: 'REQUESTED', updated: false });
   } catch (e) {
     Logger.log('requestCookMoreSecure error: ' + e.toString());

@@ -44,6 +44,8 @@ export default defineConfig({
           { src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
         ],
       },
+      // Notification taps (open the kitchen request) — see public/notification-sw.js.
+      workbox: { importScripts: ['notification-sw.js'] },
       devOptions: { enabled: false },
     }),
   ],

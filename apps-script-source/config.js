@@ -34,6 +34,8 @@ var SHEETS = {
   ACCOUNTS: "Accounts",
   USERS: "Users",
   PEOPLE: "People",
+  SHIFT_REPORTS: "ShiftReports",
+  PUSH_SUBSCRIPTIONS: "PushSubscriptions",
   AUDIT_LOG: "AuditLog",
   INVENTORY_CONSUMPTION: "Inventory_Consumption",
   PRINTERS: "Printers",

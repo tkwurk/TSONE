@@ -58,7 +58,12 @@ var Orchestrator = {
     'consumption.recorded': ['consumptionRecord'],
     'consumption.history.requested': ['consumptionHistory'],
     'report.requested':   ['reporting', 'reflection'],
-    'catalog.requested':  ['catalog']
+    'catalog.requested':  ['catalog'],
+    'shift.report.requested': ['shiftReport'],
+    'shift.report.submitted': ['shiftSubmit'],
+    'shift.history.requested': ['shiftHistory'],
+    'push.subscribed': ['pushSubscribe'],
+    'push.unsubscribed': ['pushUnsubscribe']
   },
 
   /** step name -> runner. Each runner returns an apiOk/apiFail-style envelope. */
@@ -75,7 +80,12 @@ var Orchestrator = {
     consumptionHistory: function (payload, ctx, bag) { return ReportingWorker.consumptionHistory(payload, ctx); },
     reporting:  function (payload, ctx, bag) { return ReportingWorker.generateReport((payload && payload.reportType) || 'dailyClosing', payload, ctx); },
     reflection: function (payload, ctx, bag) { return ReflectionAgent.validate(bag.reporting, ctx); },
-    catalog:    function (payload, ctx, bag) { return InventoryWorker.listProducts(ctx, payload); }
+    catalog:    function (payload, ctx, bag) { return InventoryWorker.listProducts(ctx, payload); },
+    shiftReport: function (payload, ctx, bag) { return ShiftWorker.getShiftReport(payload, ctx); },
+    shiftSubmit: function (payload, ctx, bag) { return ShiftWorker.submitShiftReport(payload, ctx); },
+    shiftHistory: function (payload, ctx, bag) { return ShiftWorker.getShiftHistory(payload, ctx); },
+    pushSubscribe: function (payload, ctx, bag) { return NotificationWorker.subscribe(payload, ctx); },
+    pushUnsubscribe: function (payload, ctx, bag) { return NotificationWorker.unsubscribe(payload, ctx); }
   },
 
   /** Builds the shared context from a SecurityWrapper params object. */

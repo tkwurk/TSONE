@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth, LoginPanel } from '@/features/auth'
 import { clearProductsCache, prefetchProducts } from '@/features/catalog'
 import { CheckoutPanel, clearPaymentMethodsCache, prefetchPaymentMethods } from '@/features/checkout'
@@ -12,7 +12,17 @@ import { DepositsPanel } from '@/features/deposits'
 import { InvestmentsPanel } from '@/features/investments'
 import { AttendancePanel } from '@/features/attendance'
 import { ChecklistPanel } from '@/features/checklist'
-import { ComingSoon, visibleNavItems } from '@/features/navigation'
+import { ShiftReportPanel } from '@/features/shiftReport'
+import { ComingSoon, canAccess, visibleNavItems } from '@/features/navigation'
+import {
+  ArrivalToast,
+  disablePush,
+  KitchenRequestsProvider,
+  NotificationBell,
+  onNotificationOpen,
+  takeDeepLink,
+  type RequestLink,
+} from '@/features/notifications'
 import { Button, Sidebar } from '@/components/ui'
 import { useI18n } from '@/i18n'
 import './App.css'
@@ -44,6 +54,25 @@ function App() {
   const { t } = useI18n()
   const [active, setActive] = useState('orders')
   const [navOpen, setNavOpen] = useState(false)
+  // Kitchen request to show (from a notification, the bell or a deep link).
+  const [focusRequest, setFocusRequest] = useState<{ id: string; seq: number } | null>(null)
+  // A notification deep link may arrive before sign-in; keep it until there is a session.
+  const [pendingLink, setPendingLink] = useState<RequestLink | null>(() => takeDeepLink())
+
+  const openRequest = useCallback((link: RequestLink) => {
+    setActive('kitchenCooking')
+    setNavOpen(false)
+    setFocusRequest((prev) => ({ id: link.requestId, seq: (prev?.seq ?? 0) + 1 }))
+  }, [])
+
+  useEffect(() => onNotificationOpen((link) => setPendingLink(link)), [])
+
+  const hasSession = !!session
+  useEffect(() => {
+    if (!hasSession || !pendingLink) return
+    openRequest(pendingLink)
+    setPendingLink(null)
+  }, [hasSession, pendingLink, openRequest])
 
   const sessionUser = session?.username
   const sessionDevice = session?.deviceId
@@ -86,7 +115,7 @@ function App() {
       case 'salesSummary':
         return <SalesReportPanel auth={auth} />
       case 'kitchenCooking':
-        return <KitchenPanel auth={auth} />
+        return <KitchenPanel auth={auth} focusRequest={focusRequest} />
       case 'purchasing':
         return <PurchasingPanel auth={auth} mode="normal" />
       case 'purchasingReceive':
@@ -109,12 +138,28 @@ function App() {
         return <AttendancePanel auth={auth} />
       case 'checklist':
         return <ChecklistPanel auth={auth} />
+      case 'shiftReport':
+        return <ShiftReportPanel auth={auth} />
       default:
         return <ComingSoon title={current ? t(current.labelKey) : ''} />
     }
   }
 
+  const kitchenAccess = canAccess(session, 'kitchenCooking')
+  // Stop pushes to this device for this user first (shared devices), but never block sign-out on it.
+  const signOut = async () => {
+    await Promise.race([disablePush(auth), new Promise((r) => setTimeout(r, 3000))])
+    logout()
+  }
+
   return (
+    <KitchenRequestsProvider
+      key={`${session.backendOutlet ?? ''}|${session.username}`}
+      auth={auth}
+      backendOutlet={session.backendOutlet}
+      enabled={kitchenAccess}
+      onOpenRequest={openRequest}
+    >
     <div className="shell">
       <header className="topbar">
         <button
@@ -128,12 +173,19 @@ function App() {
         </button>
         <h1 className="topbar__logo">TSONE</h1>
         <div className="actions">
+          <NotificationBell
+            onOpenRequest={(id) => openRequest({ requestId: id })}
+            onViewAll={() => {
+              setActive('kitchenCooking')
+              setFocusRequest((prev) => ({ id: '', seq: (prev?.seq ?? 0) + 1 }))
+            }}
+          />
           <span className="status">
             {session.username}
             {session.outlet ? ` · ${session.outlet}` : ''} · {session.role}
           </span>
           <LanguageToggle />
-          <Button variant="ghost" onClick={logout}>
+          <Button variant="ghost" onClick={signOut}>
             {t('app.signOut')}
           </Button>
         </div>
@@ -152,7 +204,9 @@ function App() {
         />
         <section className="content">{renderScreen()}</section>
       </div>
+      {kitchenAccess && <ArrivalToast onOpenRequest={(id) => openRequest({ requestId: id })} />}
     </div>
+    </KitchenRequestsProvider>
   )
 }
 

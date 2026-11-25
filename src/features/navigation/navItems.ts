@@ -26,4 +26,5 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'usageReport', labelKey: 'nav.usageReport', icon: '📉', ready: true },
   { id: 'attendance', labelKey: 'nav.attendance', icon: '🕒', ready: true },
   { id: 'checklist', labelKey: 'nav.checklist', icon: '✅', ready: true },
+  { id: 'shiftReport', labelKey: 'nav.shiftReport', icon: '🤝', ready: true },
 ]

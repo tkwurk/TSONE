@@ -27,26 +27,39 @@ var ServiceAccount = {
     var cached = cache.get(this._CACHE_KEY);
     if (cached) return cached;
 
-    var token = this._mintToken_();
-    // Google tokens last 3600s; cache a little under that.
-    cache.put(this._CACHE_KEY, token, 3300);
-    return token;
-  },
-
-  _mintToken_: function () {
     var props = PropertiesService.getScriptProperties();
     var clientEmail = props.getProperty('SA_CLIENT_EMAIL');
     var privateKey = props.getProperty('SA_PRIVATE_KEY');
     if (!clientEmail || !privateKey) {
       throw new Error('ServiceAccount not configured: set SA_CLIENT_EMAIL and SA_PRIVATE_KEY in Script Properties.');
     }
+    var token = this._mintToken_(clientEmail, privateKey, this.TOKEN_SCOPE);
+    // Google tokens last 3600s; cache a little under that.
+    cache.put(this._CACHE_KEY, token, 3300);
+    return token;
+  },
+
+  /**
+   * Cached access token for another service account / scope (e.g. Firebase
+   * Cloud Messaging). The caller supplies the credentials from Script Properties.
+   */
+  getAccessTokenFor: function (clientEmail, privateKey, scope, cacheKey) {
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get(cacheKey);
+    if (cached) return cached;
+    var token = this._mintToken_(clientEmail, privateKey, scope);
+    cache.put(cacheKey, token, 3300);
+    return token;
+  },
+
+  _mintToken_: function (clientEmail, privateKey, scope) {
     privateKey = privateKey.replace(/\\n/g, '\n');
 
     var now = Math.floor(Date.now() / 1000);
     var header = { alg: 'RS256', typ: 'JWT' };
     var claim = {
       iss: clientEmail,
-      scope: this.TOKEN_SCOPE,
+      scope: scope,
       aud: this.TOKEN_URL,
       iat: now,
       exp: now + 3600

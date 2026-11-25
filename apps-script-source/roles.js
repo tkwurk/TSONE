@@ -5,18 +5,18 @@
  */
 var ROLE_DEFAULT_TABS = {  cashier: [
     'orders', 'salesSummary', 'stockReport', 'deposits',
-    'inventoryConsumption', 'tutorials'
+    'inventoryConsumption', 'shiftReport', 'tutorials'
   ],
   supervisor: [
     'orders', 'salesSummary', 'stockReport', 'purchasing', 'purchasingReceive',
     'purchasingLocal', 'deposits', 'profitLoss', 'usageReport',
-    'monthlySalesReport', 'inventoryConsumption', 'attendance', 'checklist', 'kitchenCooking', 'drawerTest', 'tutorials'
+    'monthlySalesReport', 'inventoryConsumption', 'attendance', 'checklist', 'kitchenCooking', 'drawerTest', 'shiftReport', 'tutorials'
   ],
   manager: [
     'orders', 'salesSummary', 'stockReport', 'purchasing', 'purchasingReceive',
     'purchasingLocal', 'deposits', 'profitLoss', 'usageReport',
     'monthlySalesReport', 'inventoryConsumption', 'investments', 'attendance',
-    'checklist', 'kitchenCooking', 'drawerTest', 'tutorials'
+    'checklist', 'kitchenCooking', 'drawerTest', 'shiftReport', 'tutorials'
   ],
   admin: ['*'],
   chef: ['stockReport', 'inventoryConsumption', 'usageReport', 'kitchenCooking', 'tutorials'],
@@ -29,7 +29,7 @@ var ALL_TAB_IDS = [
   'orders', 'salesSummary', 'stockReport', 'purchasing', 'purchasingReceive',
   'purchasingLocal', 'deposits', 'profitLoss', 'usageReport',
   'monthlySalesReport', 'inventoryConsumption', 'investments', 'tutorials',
-  'adminOrders', 'attendance', 'checklist', 'kitchenCooking', 'drawerTest'
+  'adminOrders', 'attendance', 'checklist', 'kitchenCooking', 'drawerTest', 'shiftReport'
 ];
 
 function normalizeRole_(role) {

@@ -114,6 +114,7 @@ function _sweepCookingAlertsForOutlet_(outlet) {
 
   var belowCodes = {};
   var dueItems = [];
+  var pushItems = []; // same alerts, with request ids, for push notifications
   var pendingStampRows = [];
   var newAlertCount = 0;
 
@@ -136,6 +137,7 @@ function _sweepCookingAlertsForOutlet_(outlet) {
       if (due) {
         if (!last) newAlertCount++;
         dueItems.push(item);
+        pushItems.push({ requestId: vals[idx.REQUESTID], productCode: item.productCode, productName: item.name, remaining: item.remaining, requestedBy: vals[idx.REQUESTEDBY], reminder: !!last });
         pendingStampRows.push(sheetRow);
       }
     } else {
@@ -160,6 +162,7 @@ function _sweepCookingAlertsForOutlet_(outlet) {
 
       newAlertCount++;
       dueItems.push(item);
+      pushItems.push({ requestId: requestId, productCode: item.productCode, productName: item.name, remaining: item.remaining, requestedBy: 'auto', reminder: false });
       pendingStampRows.push(sheet.getLastRow());
     }
   });
@@ -171,7 +174,10 @@ function _sweepCookingAlertsForOutlet_(outlet) {
     var sent = _sendCookAlertEmail_(outlet, dueItems, isReminder, recipients);
     result.mail = sent ? (isReminder ? 'reminder-sent' : 'sent') : 'failed';
     result.mailError = sent ? '' : (_cookAlertLastMailError_ || (recipients.to.length ? '' : 'no recipients'));
-    if (sent) {
+    // Push to kitchen devices too; a reminder counts as sent if either channel delivered.
+    var push = typeof NotificationWorker !== 'undefined' ? NotificationWorker.notifyKitchenRequests(outlet, pushItems) : { sent: 0 };
+    result.push = push.sent;
+    if (sent || push.sent > 0) {
       pendingStampRows.forEach(function (sheetRow) {
         var range = sheet.getRange(sheetRow, 1, 1, sheet.getLastColumn());
         var vals = range.getValues()[0];

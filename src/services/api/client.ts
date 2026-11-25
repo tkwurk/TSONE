@@ -105,6 +105,16 @@ export const api = {
     callOrchestratedStep<T>('consumption.recorded', 'consumptionRecord', payload, auth),
   consumptionHistory: <T = unknown>(startDate: string, endDate: string, auth?: AuthContext) =>
     callOrchestratedStep<T>('consumption.history.requested', 'consumptionHistory', { startDate, endDate }, auth),
+  shiftReport: <T = unknown>(auth?: AuthContext) =>
+    callOrchestratedStep<T>('shift.report.requested', 'shiftReport', {}, auth),
+  submitShiftReport: <T = unknown>(payload: ApiPayload, auth?: AuthContext) =>
+    callOrchestratedStep<T>('shift.report.submitted', 'shiftSubmit', payload, auth),
+  shiftHistory: <T = unknown>(startDate: string, endDate: string, auth?: AuthContext) =>
+    callOrchestratedStep<T>('shift.history.requested', 'shiftHistory', { startDate, endDate }, auth),
+  pushSubscribe: <T = unknown>(payload: ApiPayload, auth?: AuthContext) =>
+    callOrchestratedStep<T>('push.subscribed', 'pushSubscribe', payload, auth),
+  pushUnsubscribe: <T = unknown>(token: string, auth?: AuthContext) =>
+    callOrchestratedStep<T>('push.unsubscribed', 'pushUnsubscribe', { token }, auth),
   products: <T = unknown>(payload: ApiPayload = {}, auth?: AuthContext) =>
     callApi<T>('catalog.requested', payload, auth),
   login: <T = unknown>(payload: ApiPayload) => callApi<T>('auth.login', payload),

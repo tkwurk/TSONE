@@ -33,6 +33,8 @@ export function DataTable<T extends Record<string, unknown>>({
   filterable = false,
   filterPlaceholder,
   columnFilters,
+  onRowClick,
+  activeRowKey,
 }: {
   columns: Column<T>[]
   rows: T[]
@@ -49,6 +51,10 @@ export function DataTable<T extends Record<string, unknown>>({
     onChange: (key: string, value: string) => void
     label: (columnLabel: ReactNode) => string
   }
+  /** Makes rows clickable (mouse, Enter or Space), e.g. to open details. */
+  onRowClick?: (row: T) => void
+  /** rowKey of the row to highlight as selected. */
+  activeRowKey?: string
 }) {
   const [sort, setSort] = useState<SortState | null>(defaultSort ?? null)
   const [query, setQuery] = useState('')
@@ -132,7 +138,23 @@ export function DataTable<T extends Record<string, unknown>>({
           </thead>
           <tbody>
             {sorted.map((r, i) => (
-              <tr key={rowKey(r, i)}>
+              <tr
+                key={rowKey(r, i)}
+                className={onRowClick ? 'data-table__row--clickable' + (activeRowKey === rowKey(r, i) ? ' data-table__row--active' : '') : undefined}
+                tabIndex={onRowClick ? 0 : undefined}
+                aria-current={onRowClick && activeRowKey === rowKey(r, i) ? 'true' : undefined}
+                onClick={onRowClick ? () => onRowClick(r) : undefined}
+                onKeyDown={
+                  onRowClick
+                    ? (ev) => {
+                        if (ev.key === 'Enter' || ev.key === ' ') {
+                          ev.preventDefault()
+                          onRowClick(r)
+                        }
+                      }
+                    : undefined
+                }
+              >
                 {columns.map((c) => (
                   <td key={c.key} style={{ textAlign: c.align ?? 'left' }}>
                     {c.render ? c.render(r) : String(r[c.key] ?? '')}

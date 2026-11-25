@@ -3,8 +3,9 @@ import { fmtDateTime, localDate, localDateTime } from '@/lib/dates'
 import type { AuthContext } from '@/services/api'
 import { Badge, Button, DataTable, Field, FormRow, Notice, Panel, Stats, SubTabs, TextArea, TextInput } from '@/components/ui'
 import { useI18n } from '@/i18n'
+import { useKitchenRequestFeed } from '@/features/notifications'
+import { RequestDetails } from './RequestDetails'
 import {
-  getCookRequests,
   getCookingHistory,
   getCookingProducts,
   getCookingTodayReport,
@@ -27,7 +28,7 @@ const CACHE_MS = 30_000
  * start/end time, qty per cooking product), handle cook requests from sales,
  * today's cooked-vs-sold report, and cooking history.
  */
-export function KitchenPanel({ auth }: { auth: AuthContext }) {
+export function KitchenPanel({ auth, focusRequest }: { auth: AuthContext; focusRequest?: { id: string; seq: number } | null }) {
   const { t, fmtNum } = useI18n()
   const [tab, setTab] = useState<Tab>('cook')
   const [msg, setMsg] = useState<Msg | null>(null)
@@ -78,20 +79,52 @@ export function KitchenPanel({ auth }: { auth: AuthContext }) {
     } else setMsg({ tone: 'error', text: r.error ?? '' })
   }
 
-  // ── Requests ──
-  const [open, setOpen] = useState<CookRequest[]>([])
-  const [recentDone, setRecentDone] = useState<CookRequest[]>([])
-  const [loadingReq, setLoadingReq] = useState(false)
+  // ── Requests (shared app-wide feed: same data as the 🔔 bell, one poll) ──
+  const feed = useKitchenRequestFeed()
+  const { open, recentDone, loading: loadingReq, reload: loadRequests, markRead } = feed
+  const [selectedReqId, setSelectedReqId] = useState('')
+  const detailsRef = useRef<HTMLDivElement>(null)
 
-  const loadRequests = useCallback(async () => {
-    setLoadingReq(true)
-    const r = await getCookRequests(auth)
-    setLoadingReq(false)
-    if (r.ok) {
-      setOpen(r.data?.open ?? [])
-      setRecentDone(r.data?.recentDone ?? [])
-    }
-  }, [auth])
+  // Set when a request is opened; the effect below moves focus once its card is rendered.
+  const focusDetails = useRef(false)
+  const selectRequest = useCallback(
+    (id: string) => {
+      setSelectedReqId(id)
+      if (id) markRead([id])
+      focusDetails.current = !!id
+    },
+    [markRead],
+  )
+
+  // Opened from a notification / the bell: show Requests and that request's details.
+  const focusSeq = focusRequest?.seq
+  const focusId = focusRequest?.id ?? ''
+  useEffect(() => {
+    if (!focusSeq) return
+    setTab('requests')
+    selectRequest(focusId)
+    loadRequests()
+    // Only react to a new focus request (seq), not to selectRequest/loadRequests identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusSeq])
+
+  useEffect(() => {
+    if (!focusDetails.current || tab !== 'requests' || !detailsRef.current) return
+    focusDetails.current = false
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    detailsRef.current.focus({ preventScroll: true })
+    detailsRef.current.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' })
+  }, [selectedReqId, tab, focusRequest?.seq])
+
+  /** From a request: go to Cook with the requested quantity filled in. */
+  const cookFor = (r: CookRequest) => {
+    const code = String(r.productCode ?? '')
+    const known = products.find((p) => p.productCode.toUpperCase() === code.toUpperCase())
+    const key = known?.productCode ?? code
+    if (r.requestedQty > 0) setQty((q) => (q[key] ? q : { ...q, [key]: String(r.requestedQty) }))
+    setTab('cook')
+    requestAnimationFrame(() => document.getElementById(`cook-qty-${key}`)?.focus())
+  }
 
   const thresholdOf = (code: unknown) => products.find((p) => p.productCode.toUpperCase() === String(code ?? '').toUpperCase())?.recookThreshold
 
@@ -166,13 +199,7 @@ export function KitchenPanel({ auth }: { auth: AuthContext }) {
 
   useEffect(() => {
     loadProducts()
-    loadRequests()
-    // Poll only while the tab is visible.
-    const id = setInterval(() => {
-      if (!document.hidden) loadRequests()
-    }, 60_000)
-    return () => clearInterval(id)
-  }, [loadProducts, loadRequests])
+  }, [loadProducts])
 
   // Auto-load the Today report / History when the tab opens or filters change (debounced for typing).
   useEffect(() => {
@@ -223,6 +250,8 @@ export function KitchenPanel({ auth }: { auth: AuthContext }) {
                   align: 'right',
                   render: (r) => (
                     <input
+                      id={`cook-qty-${String(r.productCode)}`}
+                      aria-label={`${t('kitchen.qtyCooked')} — ${String(r.name ?? r.productCode)}`}
                       type="number"
                       inputMode="decimal"
                       min={0}
@@ -258,11 +287,25 @@ export function KitchenPanel({ auth }: { auth: AuthContext }) {
               {loadingReq ? t('common.loading') : '↻'}
             </Button>
           </div>
+          {selectedReqId && (
+            <RequestDetails
+              ref={detailsRef}
+              auth={auth}
+              request={open.find((r) => r.requestId === selectedReqId) ?? recentDone.find((r) => r.requestId === selectedReqId) ?? null}
+              loaded={feed.loadedAt > 0 && !loadingReq}
+              threshold={thresholdOf(open.find((r) => r.requestId === selectedReqId)?.productCode)}
+              onCook={cookFor}
+              onChanged={loadRequests}
+              onClose={() => setSelectedReqId('')}
+            />
+          )}
           <h4 className="muted">{t('kitchen.openRequests')}</h4>
           <p className="muted">{t('kitchen.requestsHelp')}</p>
           <DataTable
             rows={open as unknown as Record<string, unknown>[]}
             rowKey={(r) => String(r.requestId)}
+            onRowClick={(r) => selectRequest(String(r.requestId))}
+            activeRowKey={selectedReqId}
             empty={t('kitchen.noRequests')}
             columns={[
               { sortable: true, key: 'productName', label: t('kitchen.product'), render: (r) => <strong>{String(r.productName ?? r.productCode)}</strong> },
@@ -319,6 +362,8 @@ export function KitchenPanel({ auth }: { auth: AuthContext }) {
               <DataTable
                 rows={recentDone as unknown as Record<string, unknown>[]}
                 rowKey={(r) => String(r.requestId)}
+                onRowClick={(r) => selectRequest(String(r.requestId))}
+                activeRowKey={selectedReqId}
                 columns={[
                   { sortable: true, key: 'productName', label: t('kitchen.product') },
                   { sortable: true, key: 'createdAt', label: t('kitchen.requestedAt'), render: (r) => fmtDateTime(r.createdAt) },
