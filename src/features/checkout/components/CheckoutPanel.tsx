@@ -138,6 +138,23 @@ export function CheckoutPanel({ session }: { session: Session }) {
   const categories = activeSupplier?.categories ?? []
   const activeCategory = categories.find((c) => c.category === category) ?? categories[0]
 
+  // Keep the selected supplier tab / category chip visible when the rows scroll sideways (phones).
+  const navRef = useRef<HTMLDivElement>(null)
+  const activeSupplierName = activeSupplier?.supplier
+  const activeCategoryName = activeCategory?.category
+  useEffect(() => {
+    navRef.current
+      ?.querySelectorAll<HTMLElement>('.supplier-tab--active, .category-chip--active')
+      .forEach((el) => {
+        const row = el.parentElement
+        if (!row) return
+        const left = el.offsetLeft - row.offsetLeft
+        if (left < row.scrollLeft || left + el.offsetWidth > row.scrollLeft + row.clientWidth) {
+          row.scrollTo({ left: Math.max(0, left - 16), behavior: 'smooth' })
+        }
+      })
+  }, [activeSupplierName, activeCategoryName])
+
   // Search spans all sellable products (ignores supplier/category when active).
   const query = search.trim().toLowerCase()
   const visibleItems = useMemo(() => {
@@ -221,6 +238,25 @@ export function CheckoutPanel({ session }: { session: Session }) {
     setCustomPrice('')
     setMessage(null)
   }, [cart, customName, customPrice, t])
+
+  // Cart holds only sold-out items: the customer leaves without buying. There is
+  // nothing to pay, but the turn-away must still be recorded (MissedOrders), so the
+  // kitchen audit can count it.
+  const onlySoldOut = cart.items.length > 0 && cart.items.every((i) => i.isSoldOut)
+  const onRecordSoldOut = useCallback(async () => {
+    const missed = missedItems(cart.items)
+    if (!missed.length) return
+    setSubmitting(true)
+    setMessage(null)
+    const res = await saveMissedOrders(missed, `SOLDOUT-${Date.now()}`, auth)
+    setSubmitting(false)
+    if (!res.success) {
+      setMessage({ tone: 'error', text: res.error ?? t('checkout.failed') })
+      return
+    }
+    cart.clear()
+    setMessage({ tone: 'info', text: `🚫 ${t('checkout.soldOutRecorded')}: ${missed.map((i) => `${i.qty}× ${i.name}`).join(', ')}` })
+  }, [cart, auth, t])
 
   const onPark = useCallback(() => {
     if (!cart.items.length) return setMessage({ tone: 'error', text: t('checkout.cartEmptyError') })
@@ -322,35 +358,52 @@ export function CheckoutPanel({ session }: { session: Session }) {
             />
           )}
 
-          {!query && bySupplier.length > 0 && (
-            <div className="supplier-nav">
-              {bySupplier.map((s) => (
-                <button
-                  key={s.supplier}
-                  type="button"
-                  className={'supplier-pill' + (activeSupplier?.supplier === s.supplier ? ' supplier-pill--active' : '')}
-                  onClick={() => setSupplier(s.supplier)}
-                >
-                  {s.supplier}
-                </button>
-              ))}
+          <div ref={navRef}>
+          {/* Suppliers = tabs (top level); hidden when there is only one to choose. */}
+          {!query && bySupplier.length > 1 && (
+            <div className="supplier-nav" role="tablist" aria-label={t('checkout.suppliers')}>
+              {bySupplier.map((s) => {
+                const active = activeSupplier?.supplier === s.supplier
+                return (
+                  <button
+                    key={s.supplier}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    className={'supplier-tab' + (active ? ' supplier-tab--active' : '')}
+                    onClick={() => setSupplier(s.supplier)}
+                  >
+                    <span aria-hidden="true">🏪</span> {s.supplier}
+                  </button>
+                )
+              })}
             </div>
           )}
 
+          {/* Categories = small chips with item counts, one scrollable line. */}
           {!query && categories.length > 0 && (
-            <div className="category-nav">
-              {categories.map((c) => (
-                <button
-                  key={c.category}
-                  type="button"
-                  className={'category-pill' + (activeCategory?.category === c.category ? ' category-pill--active' : '')}
-                  onClick={() => setCategory(c.category)}
-                >
-                  {c.category}
-                </button>
-              ))}
+            <div className="category-nav" role="group" aria-label={t('checkout.categories')}>
+              <span className="category-nav__label" aria-hidden="true">
+                🏷️
+              </span>
+              {categories.map((c) => {
+                const active = activeCategory?.category === c.category
+                return (
+                  <button
+                    key={c.category}
+                    type="button"
+                    aria-pressed={active}
+                    className={'category-chip' + (active ? ' category-chip--active' : '')}
+                    onClick={() => setCategory(c.category)}
+                  >
+                    {c.category}{' '}
+                    <span className="category-chip__count">{c.items.length}</span>
+                  </button>
+                )
+              })}
             </div>
           )}
+          </div>
 
           <div className="menu">
             {products.length === 0 ? (
@@ -555,15 +608,22 @@ export function CheckoutPanel({ session }: { session: Session }) {
             </ul>
           )}
 
+          {onlySoldOut && <p className="muted">{t('checkout.soldOutOnlyHint')}</p>}
           <div className="checkout-total">
             <span>{t('checkout.total')}</span>
             <span>{fmtMoney(cart.total)}</span>
           </div>
 
           <div className="actions">
-            <Button onClick={onProceed} disabled={!configured || submitting || cart.items.length === 0}>
-              💳 {t('checkout.proceed')}
-            </Button>
+            {onlySoldOut ? (
+              <Button onClick={onRecordSoldOut} disabled={!configured || submitting} title={t('checkout.soldOutOnlyHint')}>
+                {submitting ? t('checkout.submitting') : `🚫 ${t('checkout.recordSoldOut')}`}
+              </Button>
+            ) : (
+              <Button onClick={onProceed} disabled={!configured || submitting || cart.items.length === 0}>
+                💳 {t('checkout.proceed')}
+              </Button>
+            )}
             {cart.items.length > 0 && (
               <Button variant="ghost" onClick={cart.clear}>
                 {t('checkout.clear')}

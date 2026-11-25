@@ -101,6 +101,11 @@ export const dict: Record<Lang, Record<string, string>> = {
 
     'cart.soldOut': 'Sold out',
     'cart.markSoldOut': 'Mark sold out',
+    'checkout.suppliers': 'Suppliers',
+    'checkout.categories': 'Categories',
+    'checkout.recordSoldOut': 'Record sold-out',
+    'checkout.soldOutRecorded': 'Sold-out recorded',
+    'checkout.soldOutOnlyHint': 'Only sold-out items: nothing to pay. Record them so the customer who could not be served is counted in the kitchen audit.',
     'cart.unmarkSoldOut': 'Available again',
     'cart.leftover': 'Leftover',
     'cart.markLeftover': 'Leftover',
@@ -782,6 +787,11 @@ export const dict: Record<Lang, Record<string, string>> = {
 
     'cart.soldOut': 'Habis',
     'cart.markSoldOut': 'Tandai habis',
+    'checkout.suppliers': 'Pemasok',
+    'checkout.categories': 'Kategori',
+    'checkout.recordSoldOut': 'Catat habis',
+    'checkout.soldOutRecorded': 'Habis tercatat',
+    'checkout.soldOutOnlyHint': 'Hanya item habis: tidak ada yang dibayar. Catat agar pelanggan yang tidak terlayani dihitung di audit dapur.',
     'cart.unmarkSoldOut': 'Tersedia lagi',
     'cart.leftover': 'Sisa',
     'cart.markLeftover': 'Sisa',

@@ -377,38 +377,52 @@
   margin-top: 1rem;
 }
 
+/* Suppliers: top-level tabs — bold text, coloured underline, full-width rule. */
 .supplier-nav {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  margin: 0.75rem 0 0.25rem;
+  gap: 0.25rem;
+  margin: 0.75rem 0 0.5rem;
+  border-bottom: 2px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
-.supplier-pill {
+.supplier-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.supplier-tab {
+  flex: none;
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 1rem;
   font-weight: 600;
-  padding: 0.35rem 0.8rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
+  min-height: 44px;
+  padding: 0.5rem 0.9rem;
+  margin-bottom: -2px;
+  border: 0;
+  border-bottom: 3px solid transparent;
   background: transparent;
   color: var(--text);
   cursor: pointer;
+  white-space: nowrap;
 }
 
-.supplier-pill--active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+.supplier-tab:hover {
+  color: var(--text-h);
 }
 
-.category-nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin: 0.25rem 0 0.5rem;
+.supplier-tab--active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
 }
 
+.supplier-tab:focus-visible,
+.category-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Pill buttons still used by Purchasing's category filter. */
 .category-pill {
   font: inherit;
   font-size: 0.8rem;
@@ -426,6 +440,63 @@
   border-color: var(--accent-border);
   color: var(--text-h);
   font-weight: 600;
+}
+
+/* Categories: small chips with counts on one line (scrolls sideways on phones). */
+.category-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.25rem 0 0.75rem;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none; /* a cut-off chip at the edge shows there is more to swipe */
+}
+
+.category-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.category-nav__label {
+  flex: none;
+  font-size: 0.9rem;
+  opacity: 0.7;
+}
+
+.category-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  min-height: 36px;
+  padding: 0.25rem 0.55rem 0.25rem 0.7rem;
+  border-radius: 6px;
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.category-chip--active {
+  border-style: solid;
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.category-chip__count {
+  min-width: 1.4em;
+  padding: 0 0.3em;
+  border-radius: 999px;
+  background: var(--code-bg, rgba(0, 0, 0, 0.06));
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
 }
 
 .menu-cat {
