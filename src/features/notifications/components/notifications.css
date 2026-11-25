@@ -229,3 +229,11 @@
     max-height: calc(100dvh - 5rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   }
 }
+
+.notify__test {
+  margin-top: 0.5rem;
+}
+
+.notify__test p {
+  margin: 0.35rem 0 0;
+}

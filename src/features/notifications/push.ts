@@ -111,3 +111,12 @@ export async function disablePush(auth: AuthContext): Promise<void> {
     /* best effort */
   }
 }
+
+/** Asks the backend to push a test notification to this device after `delaySeconds` (max 15). */
+export async function sendTestPush(auth: AuthContext, delaySeconds: number): Promise<{ ok: boolean; error?: string }> {
+  const s = readStored()
+  if (!s?.token) return { ok: false, error: 'not-registered' }
+  const r = await api.pushTest({ token: s.token, delaySeconds }, auth)
+  // The orchestrator prefixes worker errors; show only the worker's own message.
+  return r.success ? { ok: true } : { ok: false, error: String(r.error ?? '').replace(/^Pipeline failed at step "[^"]+": /, '') }
+}

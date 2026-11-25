@@ -13,6 +13,7 @@ const plain = (x) => JSON.parse(JSON.stringify(x))
 function setup({ configured = true, fcm = () => 200, tabs = ['kitchenCooking'], tokenThrows = false } = {}) {
   let table = { headers: [], rows: [] }
   const fetched = []
+  const slept = []
   const props = configured
     ? { FIREBASE_SERVICE_ACCOUNT: JSON.stringify({ project_id: 'tsone-push', client_email: 'sa@x', private_key: 'k' }) }
     : {}
@@ -33,6 +34,7 @@ function setup({ configured = true, fcm = () => 200, tabs = ['kitchenCooking'], 
       return { username: a.username, deviceId: 'dev', outlet: 'TS5' }
     },
     canonicalOutletKey_: (o) => String(o || '').trim().toUpperCase(),
+    Utilities: { sleep: (ms) => { slept.push(ms) } },
     PropertiesService: { getScriptProperties: () => ({ getProperty: (k) => props[k] ?? null }) },
     ServiceAccount: { getAccessTokenFor: (email, key, scope) => { if (tokenThrows) throw new Error('token boom'); assert.equal(scope, 'https://www.googleapis.com/auth/firebase.messaging'); return 'ACCESS' } },
     UrlFetchApp: {
@@ -54,7 +56,7 @@ function setup({ configured = true, fcm = () => 200, tabs = ['kitchenCooking'], 
     },
   })
   vm.runInContext(src('notificationWorker.gs'), ctx, { filename: 'notificationWorker.gs' })
-  return { W: ctx.NotificationWorker, table: () => table, fetched }
+  return { W: ctx.NotificationWorker, table: () => table, fetched, slept }
 }
 
 const sub = (W, username, token, extra = {}) =>
@@ -136,4 +138,36 @@ test('unsubscribe only switches off the caller\'s own token', () => {
   assert.equal(table().rows[0].Active, 'Y')
   W.unsubscribe({ _authContext: { username: 'chef1', deviceId: 'dev' }, token: T(1) }, {})
   assert.equal(table().rows[0].Active, 'N')
+})
+
+test('test push goes only to the caller\'s own device, after the requested delay', () => {
+  const { W, fetched, slept } = setup()
+  sub(W, 'chef1', T(1), { lang: 'id' })
+  sub(W, 'chef1', T(2))
+  sub(W, 'chef2', T(3))
+  const r = W.sendTest({ _authContext: { username: 'chef1', deviceId: 'dev' }, token: T(1), delaySeconds: 10 }, {})
+  assert.equal(r.code, 'PUSH_TEST_SENT', r.error)
+  assert.deepEqual(plain(fetched.map((f) => f.token)), [T(1)])
+  assert.equal(fetched[0].webpush.data.type, 'test')
+  assert.equal(fetched[0].webpush.data.title, '🔔 Notifikasi uji TSONE')
+  assert.deepEqual(plain(slept), [10000])
+  // Delay is capped at 15 s.
+  W.sendTest({ _authContext: { username: 'chef1', deviceId: 'dev' }, token: T(2), delaySeconds: 600 }, {})
+  assert.equal(slept[1], 15000)
+})
+
+test('test push explains what is wrong', () => {
+  assert.equal(setup({ configured: false }).W.sendTest({ _authContext: { username: 'chef1', deviceId: 'dev' } }, {}).code, 'PUSH_NOT_CONFIGURED')
+  const none = setup()
+  sub(none.W, 'chef2', T(3))
+  assert.equal(none.W.sendTest({ _authContext: { username: 'chef1', deviceId: 'dev' } }, {}).code, 'PUSH_NO_DEVICE')
+  const failing = setup({ fcm: () => 403 })
+  sub(failing.W, 'chef1', T(1))
+  const r = failing.W.sendTest({ _authContext: { username: 'chef1', deviceId: 'dev' }, token: T(1) }, {})
+  assert.equal(r.code, 'PUSH_SEND_FAILED')
+  assert.match(r.error, /403/)
+  const expired = setup({ fcm: () => 404 })
+  sub(expired.W, 'chef1', T(1))
+  assert.equal(expired.W.sendTest({ _authContext: { username: 'chef1', deviceId: 'dev' }, token: T(1) }, {}).code, 'PUSH_DEVICE_EXPIRED')
+  assert.equal(expired.table().rows[0].Active, 'N')
 })

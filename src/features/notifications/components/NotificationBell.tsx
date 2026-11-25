@@ -14,6 +14,9 @@ import {
 } from '../systemNotify'
 import './notifications.css'
 
+/** Seconds before the test push is sent: time to close TSONE and see it arrive while closed. */
+const TEST_DELAY_S = 10
+
 /**
  * Top-bar bell for kitchen requests: unread count, a panel listing open
  * requests (tap one to open its details in Kitchen → Requests), and the
@@ -25,6 +28,7 @@ export function NotificationBell({ onOpenRequest, onViewAll }: { onOpenRequest: 
   const [open, setOpen] = useState(false)
   const [permission, setPermission] = useState<NotifyPermission>(notifyPermission)
   const [muted, setMutedState] = useState(isMuted)
+  const [test, setTest] = useState<{ state: 'idle' | 'sending' | 'sent' | 'error'; error?: string }>({ state: 'idle' })
   const panelRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -58,6 +62,12 @@ export function NotificationBell({ onOpenRequest, onViewAll }: { onOpenRequest: 
     setMutedState(!muted)
     await feed.setPush(muted) // was muted → turning on
   }
+  const sendTest = async () => {
+    setTest({ state: 'sending' })
+    const r = await feed.testPush(TEST_DELAY_S)
+    setTest(r.ok ? { state: 'sent' } : { state: 'error', error: r.error === 'not-registered' ? t('notify.testNotRegistered') : r.error })
+  }
+
   const openRequest = (id: string) => {
     feed.markRead([id])
     setOpen(false)
@@ -170,6 +180,22 @@ export function NotificationBell({ onOpenRequest, onViewAll }: { onOpenRequest: 
                   <Button variant="ghost" onClick={() => feed.setPush(true)}>
                     {t('notify.retry')}
                   </Button>
+                )}
+                {!muted && feed.push === 'on' && (
+                  <div className="notify__test">
+                    <Button variant="ghost" onClick={sendTest} disabled={test.state === 'sending'}>
+                      {test.state === 'sending' ? t('notify.testSending') : `📨 ${t('notify.testSend')}`}
+                    </Button>
+                    <p className="muted" aria-live="polite">
+                      {test.state === 'sent'
+                        ? `✓ ${t('notify.testSent')}`
+                        : test.state === 'error'
+                          ? `⚠️ ${test.error || t('notify.testFailed')}`
+                          : test.state === 'sending'
+                            ? t('notify.testCloseNow')
+                            : t('notify.testHint')}
+                    </p>
+                  </div>
                 )}
               </>
             )}

@@ -81,7 +81,7 @@ calls `Repo`. Known events include `checkout.completed`, `stock.updated`,
 `stock.report.requested`, `stock.history.status.requested`,
 `stock.history.schedule.requested`, `consumption.closing.requested`,
 `consumption.recorded`, `consumption.history.requested`, `shift.report.requested`, `shift.report.submitted`, `shift.history.requested`,
-`push.subscribed`, `push.unsubscribed`,
+`push.subscribed`, `push.unsubscribed`, `push.test.requested`,
 `report.requested`, and `purchase.recorded`.
 Keep the `// Copilot:` intent comment above each worker method.
 

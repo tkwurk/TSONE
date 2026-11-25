@@ -11,6 +11,7 @@
  * Events (routed by the Orchestrator):
  *   push.subscribed    → NotificationWorker.subscribe    (save this device's token)
  *   push.unsubscribed  → NotificationWorker.unsubscribe  (stop pushes to this device)
+ *   push.test.requested → NotificationWorker.sendTest    (test push to the caller's own device)
  *
  * One-time setup per outlet (Apps Script → Project Settings → Script Properties):
  *   FIREBASE_SERVICE_ACCOUNT = the whole JSON key file of a Firebase service
@@ -109,50 +110,15 @@ var NotificationWorker = {
       });
       if (!subs.length) { result.skipped = 'no-devices'; return result; }
 
-      var accessToken = ServiceAccount.getAccessTokenFor(cfg.client_email, cfg.private_key, this.FCM_SCOPE, 'fcm_access_token');
-      var url = 'https://fcm.googleapis.com/v1/projects/' + encodeURIComponent(cfg.project_id) + '/messages:send';
-      var sends = [];
       var self = this;
-      subs.forEach(function (sub) {
-        var data = items.length > self.SUMMARY_OVER ? [self._summaryData_(items, sub.lang)] : items.map(function (it) { return self._itemData_(it, sub.lang); });
-        data.forEach(function (d) {
-          sends.push({
-            sub: sub,
-            request: {
-              url: url,
-              method: 'post',
-              contentType: 'application/json',
-              headers: { Authorization: 'Bearer ' + accessToken },
-              muteHttpExceptions: true,
-              // Data-only message: the app's service worker builds the notification.
-              payload: JSON.stringify({ message: { token: sub.token, webpush: { headers: { Urgency: 'high', TTL: '1800' }, data: d } } })
-            }
-          });
-        });
+      var sent = this._send_(cfg, table, subs, function (sub) {
+        return items.length > self.SUMMARY_OVER
+          ? [self._summaryData_(items, sub.lang)]
+          : items.map(function (it) { return self._itemData_(it, sub.lang); });
       });
-
-      var responses = UrlFetchApp.fetchAll(sends.map(function (s) { return s.request; }));
-      var dead = {};
-      responses.forEach(function (resp, n) {
-        var code = resp.getResponseCode();
-        if (code >= 200 && code < 300) { result.sent++; return; }
-        result.failed++;
-        var body = resp.getContentText() || '';
-        // Token no longer valid (app uninstalled, permission revoked, …): stop using it.
-        if (code === 404 || /UNREGISTERED|registration-token-not-registered|Requested entity was not found/i.test(body)) {
-          dead[sends[n].sub.token] = { sub: sends[n].sub, error: code + ' ' + body.slice(0, 200) };
-        } else {
-          Logger.log('FCM send failed (' + code + '): ' + body.slice(0, 300));
-        }
-      });
-      Object.keys(dead).forEach(function (t) {
-        var d = dead[t];
-        d.sub.row['Active'] = 'N';
-        d.sub.row['Updated At'] = new Date();
-        d.sub.row['Last Error'] = d.error;
-        self._writeRow_(table.headers, d.sub.index, d.sub.row);
-        result.removed++;
-      });
+      result.sent = sent.sent;
+      result.failed = sent.failed;
+      result.removed = sent.removed;
     } catch (e) {
       result.error = String(e && e.message || e);
       try { Logger.log('notifyKitchenRequests error: ' + result.error); } catch (e2) { /* ignore */ }
@@ -160,9 +126,98 @@ var NotificationWorker = {
     return result;
   },
 
+  // Copilot: Send a test notification to the caller's own device(s) so they can
+  // check the whole push chain. Optional delay (max 15 s) lets them close the app first.
+  sendTest: function (payload, ctx) {
+    var session = requirePermission_(payload, this.PERMISSION);
+    var cfg = this._fcmConfig_();
+    if (!cfg) {
+      return apiFail('Push is not set up for this outlet yet: add FIREBASE_SERVICE_ACCOUNT to its Script Properties.', 'PUSH_NOT_CONFIGURED');
+    }
+    var token = String((payload && payload.token) || '').trim();
+    var me = String(session.username || '').toLowerCase();
+    var table = Repo.readTable('PUSH_SUBSCRIPTIONS');
+    var subs = [];
+    table.rows.forEach(function (r, i) {
+      if (String(r['Active'] || '').toUpperCase() !== 'Y') return;
+      if (String(r['Username'] || '').toLowerCase() !== me) return;
+      if (token && String(r['Token'] || '') !== token) return;
+      subs.push({ token: String(r['Token']), lang: r['Language'] === 'id' ? 'id' : 'en', index: i, row: r });
+    });
+    if (!subs.length) {
+      return apiFail('This device is not registered for push. Turn notifications off and on again in the bell.', 'PUSH_NO_DEVICE');
+    }
+    var delay = Math.min(Math.max(Number(payload && payload.delaySeconds) || 0, 0), 15);
+    if (delay) Utilities.sleep(delay * 1000);
+    var self = this;
+    var r = this._send_(cfg, table, subs, function (sub) {
+      var tx = self._text_[sub.lang];
+      return [{ type: 'test', tag: 'tsone-test', title: '🔔 ' + tx.testTitle, body: tx.testBody, renotify: '1' }];
+    });
+    if (!r.sent) {
+      return apiFail('Firebase did not accept the test push: ' + (r.lastError || 'unknown error'), r.removed ? 'PUSH_DEVICE_EXPIRED' : 'PUSH_SEND_FAILED');
+    }
+    return apiOk({ sent: r.sent, failed: r.failed }, 'PUSH_TEST_SENT');
+  },
+
+  /**
+   * Sends data-only pushes; `dataFor(sub)` returns the messages for one device.
+   * Switches off tokens FCM reports as unregistered.
+   * @return {{ sent: number, failed: number, removed: number, lastError: string }}
+   */
+  _send_: function (cfg, table, subs, dataFor) {
+    var out = { sent: 0, failed: 0, removed: 0, lastError: '' };
+    var accessToken = ServiceAccount.getAccessTokenFor(cfg.client_email, cfg.private_key, this.FCM_SCOPE, 'fcm_access_token');
+    var url = 'https://fcm.googleapis.com/v1/projects/' + encodeURIComponent(cfg.project_id) + '/messages:send';
+    var sends = [];
+    subs.forEach(function (sub) {
+      dataFor(sub).forEach(function (d) {
+        sends.push({
+          sub: sub,
+          request: {
+            url: url,
+            method: 'post',
+            contentType: 'application/json',
+            headers: { Authorization: 'Bearer ' + accessToken },
+            muteHttpExceptions: true,
+            // Data-only message: the app's service worker builds the notification.
+            payload: JSON.stringify({ message: { token: sub.token, webpush: { headers: { Urgency: 'high', TTL: '1800' }, data: d } } })
+          }
+        });
+      });
+    });
+    if (!sends.length) return out;
+
+    var responses = UrlFetchApp.fetchAll(sends.map(function (s) { return s.request; }));
+    var dead = {};
+    responses.forEach(function (resp, n) {
+      var code = resp.getResponseCode();
+      if (code >= 200 && code < 300) { out.sent++; return; }
+      out.failed++;
+      var body = resp.getContentText() || '';
+      out.lastError = code + ' ' + body.slice(0, 300);
+      // Token no longer valid (app uninstalled, permission revoked, …): stop using it.
+      if (code === 404 || /UNREGISTERED|registration-token-not-registered|Requested entity was not found/i.test(body)) {
+        dead[sends[n].sub.token] = { sub: sends[n].sub, error: code + ' ' + body.slice(0, 200) };
+      } else {
+        Logger.log('FCM send failed (' + code + '): ' + body.slice(0, 300));
+      }
+    });
+    var self = this;
+    Object.keys(dead).forEach(function (t) {
+      var d = dead[t];
+      d.sub.row['Active'] = 'N';
+      d.sub.row['Updated At'] = new Date();
+      d.sub.row['Last Error'] = d.error;
+      self._writeRow_(table.headers, d.sub.index, d.sub.row);
+      out.removed++;
+    });
+    return out;
+  },
+
   _text_: {
-    en: { newTitle: 'Cook more', reminderTitle: 'Still waiting', many: 'new kitchen requests', remaining: 'Remaining', qty: 'qty', by: 'by' },
-    id: { newTitle: 'Masak lagi', reminderTitle: 'Masih menunggu', many: 'permintaan dapur baru', remaining: 'Sisa', qty: 'jml', by: 'oleh' }
+    en: { newTitle: 'Cook more', reminderTitle: 'Still waiting', many: 'new kitchen requests', remaining: 'Remaining', qty: 'qty', by: 'by', testTitle: 'TSONE test notification', testBody: 'Push notifications work on this device.' },
+    id: { newTitle: 'Masak lagi', reminderTitle: 'Masih menunggu', many: 'permintaan dapur baru', remaining: 'Sisa', qty: 'jml', by: 'oleh', testTitle: 'Notifikasi uji TSONE', testBody: 'Notifikasi push berfungsi di perangkat ini.' }
   },
 
   /** FCM data values must all be strings. */

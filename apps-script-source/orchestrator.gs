@@ -63,7 +63,8 @@ var Orchestrator = {
     'shift.report.submitted': ['shiftSubmit'],
     'shift.history.requested': ['shiftHistory'],
     'push.subscribed': ['pushSubscribe'],
-    'push.unsubscribed': ['pushUnsubscribe']
+    'push.unsubscribed': ['pushUnsubscribe'],
+    'push.test.requested': ['pushTest']
   },
 
   /** step name -> runner. Each runner returns an apiOk/apiFail-style envelope. */
@@ -85,7 +86,8 @@ var Orchestrator = {
     shiftSubmit: function (payload, ctx, bag) { return ShiftWorker.submitShiftReport(payload, ctx); },
     shiftHistory: function (payload, ctx, bag) { return ShiftWorker.getShiftHistory(payload, ctx); },
     pushSubscribe: function (payload, ctx, bag) { return NotificationWorker.subscribe(payload, ctx); },
-    pushUnsubscribe: function (payload, ctx, bag) { return NotificationWorker.unsubscribe(payload, ctx); }
+    pushUnsubscribe: function (payload, ctx, bag) { return NotificationWorker.unsubscribe(payload, ctx); },
+    pushTest: function (payload, ctx, bag) { return NotificationWorker.sendTest(payload, ctx); }
   },
 
   /** Builds the shared context from a SecurityWrapper params object. */

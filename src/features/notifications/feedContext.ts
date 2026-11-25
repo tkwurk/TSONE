@@ -25,6 +25,8 @@ export interface KitchenRequestFeed {
   push: PushStatus
   /** Turn push for this device on (after permission) or off. */
   setPush: (on: boolean) => Promise<void>
+  /** Push a test notification to this device after a short delay. */
+  testPush: (delaySeconds: number) => Promise<{ ok: boolean; error?: string }>
 }
 
 const disabled: KitchenRequestFeed = {
@@ -42,6 +44,7 @@ const disabled: KitchenRequestFeed = {
   dismissArrival: () => {},
   push: 'off',
   setPush: async () => {},
+  testPush: async () => ({ ok: false }),
 }
 
 export const KitchenFeedContext = createContext<KitchenRequestFeed>(disabled)

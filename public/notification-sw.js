@@ -1,6 +1,6 @@
 /* Imported by the generated service worker (vite.config.ts → workbox.importScripts).
  *
- * push: kitchen-request pushes from Firebase Cloud Messaging (data-only; see
+ * push: test pushes (always shown) and kitchen-request pushes from Firebase Cloud Messaging (data-only; see
  * apps-script-source/notificationWorker.gs). If a TSONE window is on screen it
  * gets a message to refresh (it shows its own in-app alert); otherwise a system
  * notification is shown. One tag per request, so a reminder replaces it.
@@ -27,8 +27,23 @@ self.addEventListener('push', (event) => {
   }
   // FCM wraps data-only messages as { data: {...}, from, fcmMessageId, … }.
   const d = payload.data || payload
-  if (d.type !== 'kitchen-request') return
   const scope = self.registration.scope
+  // Test push from the bell: always shown, even with TSONE on screen.
+  if (d.type === 'test') {
+    event.waitUntil(
+      self.registration.showNotification(d.title || 'TSONE', {
+        body: d.body || '',
+        tag: 'tsone-test',
+        renotify: true,
+        icon: scope + 'pwa-192x192.png',
+        badge: scope + 'pwa-192x192.png',
+        timestamp: Date.now(),
+        data: { url: scope },
+      }),
+    )
+    return
+  }
+  if (d.type !== 'kitchen-request') return
   event.waitUntil(
     (async () => {
       const windows = await appWindows()

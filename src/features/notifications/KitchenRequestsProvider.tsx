@@ -5,7 +5,7 @@ import { fmtTimeOnly } from '@/lib/dates'
 import { getCookRequests, type CookRequest } from '@/features/kitchen/api'
 import { requestUrl, type RequestLink } from './deepLink'
 import { KitchenFeedContext, alertKey, isReminder, type KitchenRequestFeed, type PushStatus } from './feedContext'
-import { disablePush, enablePush, pushActiveFor } from './push'
+import { disablePush, enablePush, pushActiveFor, sendTestPush } from './push'
 import { canShowSystemNotifications, closeSystemNotifications, NOTIFY_TAG_PREFIX, setAppBadge, showSystemNotification } from './systemNotify'
 
 const POLL_MS = 60_000
@@ -205,6 +205,8 @@ export function KitchenRequestsProvider({
     [auth, backendOutlet, lang],
   )
 
+  const testPush = useCallback((delaySeconds: number) => sendTestPush(auth, delaySeconds), [auth])
+
   // A push arrived while the app is open: refresh now instead of waiting for the next poll.
   useEffect(() => {
     if (!enabled || !('serviceWorker' in navigator)) return
@@ -254,8 +256,9 @@ export function KitchenRequestsProvider({
       dismissArrival: () => setArrival(null),
       push,
       setPush,
+      testPush,
     }),
-    [enabled, open, recentDone, loading, error, loadedAt, reload, isUnread, unreadCount, markRead, arrival, push, setPush],
+    [enabled, open, recentDone, loading, error, loadedAt, reload, isUnread, unreadCount, markRead, arrival, push, setPush, testPush],
   )
 
   return <KitchenFeedContext.Provider value={value}>{children}</KitchenFeedContext.Provider>

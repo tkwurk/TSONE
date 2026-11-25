@@ -38,6 +38,7 @@ export type ApiEventType =
   | 'shift.history.requested'
   | 'push.subscribed'
   | 'push.unsubscribed'
+  | 'push.test.requested'
   | 'auth.login'
   | 'auth.logout'
   | 'rpc'

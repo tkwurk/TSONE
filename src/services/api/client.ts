@@ -115,6 +115,8 @@ export const api = {
     callOrchestratedStep<T>('push.subscribed', 'pushSubscribe', payload, auth),
   pushUnsubscribe: <T = unknown>(token: string, auth?: AuthContext) =>
     callOrchestratedStep<T>('push.unsubscribed', 'pushUnsubscribe', { token }, auth),
+  pushTest: <T = unknown>(payload: ApiPayload, auth?: AuthContext) =>
+    callOrchestratedStep<T>('push.test.requested', 'pushTest', payload, auth),
   products: <T = unknown>(payload: ApiPayload = {}, auth?: AuthContext) =>
     callApi<T>('catalog.requested', payload, auth),
   login: <T = unknown>(payload: ApiPayload) => callApi<T>('auth.login', payload),
