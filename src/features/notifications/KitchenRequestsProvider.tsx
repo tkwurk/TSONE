@@ -205,7 +205,14 @@ export function KitchenRequestsProvider({
     [auth, backendOutlet, lang],
   )
 
-  const testPush = useCallback((delaySeconds: number) => sendTestPush(auth, delaySeconds), [auth])
+  const testPush = useCallback(
+    async (delaySeconds: number) => {
+      const r = await sendTestPush(auth, backendOutlet, lang, delaySeconds)
+      if (r.renewed) setPushState(r.ok ? 'on' : 'error')
+      return r
+    },
+    [auth, backendOutlet, lang],
+  )
 
   // A push arrived while the app is open: refresh now instead of waiting for the next poll.
   useEffect(() => {

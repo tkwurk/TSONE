@@ -100,23 +100,54 @@ export async function enablePush(auth: AuthContext, outlet: string | undefined, 
   }
 }
 
-/** Stop pushes to this device for the signed-in user (sign-out / turned off). Never throws. */
-export async function disablePush(auth: AuthContext): Promise<void> {
-  const s = readStored()
+/** Drop this device's FCM token so the next getToken() creates a fresh one. Never throws. */
+async function forgetToken(): Promise<void> {
   localStorage.removeItem(STORE_KEY)
-  if (!s?.token) return
   try {
-    await api.pushUnsubscribe(s.token, auth)
+    const fb = await messaging()
+    if (fb) await fb.fm.deleteToken(fb.m)
   } catch {
-    /* best effort */
+    /* already gone */
   }
 }
 
-/** Asks the backend to push a test notification to this device after `delaySeconds` (max 15). */
-export async function sendTestPush(auth: AuthContext, delaySeconds: number): Promise<{ ok: boolean; error?: string }> {
+/** Stop pushes to this device for the signed-in user (sign-out / turned off). Never throws. */
+export async function disablePush(auth: AuthContext): Promise<void> {
   const s = readStored()
-  if (!s?.token) return { ok: false, error: 'not-registered' }
-  const r = await api.pushTest({ token: s.token, delaySeconds }, auth)
-  // The orchestrator prefixes worker errors; show only the worker's own message.
-  return r.success ? { ok: true } : { ok: false, error: String(r.error ?? '').replace(/^Pipeline failed at step "[^"]+": /, '') }
+  try {
+    if (s?.token) await api.pushUnsubscribe(s.token, auth)
+  } catch {
+    /* best effort */
+  }
+  // Turning off and on again must give a fresh registration, not the old one.
+  await forgetToken()
+}
+
+/** Firebase no longer knows this device's token (or the backend switched it off). */
+const DEAD_TOKEN = /\b404\b|NotRegistered|UNREGISTERED|not registered/i
+
+/**
+ * Asks the backend to push a test notification to this device after `delaySeconds`
+ * (max 15). If the device's registration turns out to be dead, it is replaced with
+ * a fresh one and the test is sent once more.
+ */
+export async function sendTestPush(
+  auth: AuthContext,
+  outlet: string | undefined,
+  lang: string,
+  delaySeconds: number,
+): Promise<{ ok: boolean; error?: string; renewed?: boolean }> {
+  const send = async () => {
+    const s = readStored()
+    if (!s?.token) return { ok: false, error: 'not-registered' }
+    const r = await api.pushTest({ token: s.token, delaySeconds }, auth)
+    // The orchestrator prefixes worker errors; show only the worker's own message.
+    return r.success ? { ok: true } : { ok: false, error: String(r.error ?? '').replace(/^Pipeline failed at step "[^"]+": /, '') }
+  }
+  const first = await send()
+  if (first.ok || !DEAD_TOKEN.test(first.error ?? '')) return first
+  await forgetToken()
+  const again = await enablePush(auth, outlet, lang, true)
+  if (again !== 'on') return { ok: false, error: first.error }
+  return { ...(await send()), renewed: true }
 }
