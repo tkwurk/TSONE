@@ -39,6 +39,7 @@ export type ApiEventType =
   | 'push.subscribed'
   | 'push.unsubscribed'
   | 'push.test.requested'
+  | 'cooking.audit.requested'
   | 'auth.login'
   | 'auth.logout'
   | 'rpc'

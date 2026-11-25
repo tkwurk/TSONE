@@ -64,7 +64,8 @@ var Orchestrator = {
     'shift.history.requested': ['shiftHistory'],
     'push.subscribed': ['pushSubscribe'],
     'push.unsubscribed': ['pushUnsubscribe'],
-    'push.test.requested': ['pushTest']
+    'push.test.requested': ['pushTest'],
+    'cooking.audit.requested': ['cookingAudit']
   },
 
   /** step name -> runner. Each runner returns an apiOk/apiFail-style envelope. */
@@ -87,7 +88,8 @@ var Orchestrator = {
     shiftHistory: function (payload, ctx, bag) { return ShiftWorker.getShiftHistory(payload, ctx); },
     pushSubscribe: function (payload, ctx, bag) { return NotificationWorker.subscribe(payload, ctx); },
     pushUnsubscribe: function (payload, ctx, bag) { return NotificationWorker.unsubscribe(payload, ctx); },
-    pushTest: function (payload, ctx, bag) { return NotificationWorker.sendTest(payload, ctx); }
+    pushTest: function (payload, ctx, bag) { return NotificationWorker.sendTest(payload, ctx); },
+    cookingAudit: function (payload, ctx, bag) { return ReportingWorker.cookingAudit(payload, ctx); }
   },
 
   /** Builds the shared context from a SecurityWrapper params object. */

@@ -15,6 +15,26 @@
 // validation before it reaches the Orchestrator.
 var ReportingWorker = {
 
+  // Copilot: Cooking audit for the authenticated outlet: every sell-out of a cooked
+  // product in the period, how long until the next batch was ready, customers
+  // turned away meanwhile, and a suggested recook threshold per product.
+  cookingAudit: function (params, ctx) {
+    var session = requirePermission_(params, 'kitchenCooking');
+    var outlet = String(session.outlet || '').trim();
+    if (!outlet) throw new Error('Outlet is required for the cooking audit.');
+    var re = /^\d{4}-\d{2}-\d{2}$/;
+    var start = String(params.startDate || '');
+    var end = String(params.endDate || '');
+    if (!re.test(start) || !re.test(end) || start > end) throw new Error('Choose a valid date range.');
+    var spanDays = (new Date(end + 'T00:00:00Z') - new Date(start + 'T00:00:00Z')) / 86400000;
+    if (spanDays > 92) throw new Error('Choose a period of at most 3 months.');
+    var audit = buildCookingAudit_(loadCookingAuditInput_(outlet, start, end, new Date()));
+    audit.outlet = outlet;
+    audit.startDate = start;
+    audit.endDate = end;
+    return apiOk(audit, 'COOKING_AUDIT_OK');
+  },
+
   // Copilot: Report daily recorded consumption totals for the authenticated outlet.
   consumptionHistory: function (params, ctx) {
     var session = requirePermission_(params, 'inventoryConsumption');

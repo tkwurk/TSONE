@@ -1,4 +1,4 @@
-import { callSecure } from '@/services/api'
+import { api, callSecure } from '@/services/api'
 import type { AuthContext } from '@/services/api'
 
 export interface CookingProduct {
@@ -89,3 +89,66 @@ export const getCookingTodayReport = (reportDate: string | undefined, auth: Auth
     reportDate ? { reportDate } : {},
     auth,
   )
+
+// ---------- Cooking audit (server-computed; display only) ----------
+export interface CookingAuditEpisode {
+  productCode: string
+  name: string
+  day: string
+  soldOutAt: string
+  cookStartAt: string
+  readyAt: string
+  restocked: boolean
+  /** Sold out → next batch ready. */
+  waitMin: number | null
+  /** Sold out → cooking started (negative = started before it ran out). */
+  reactionMin: number | null
+  cookMin: number | null
+  cookedQty: number
+  chef: string
+  /** Missed orders (sold-out lines at checkout) during the gap. */
+  turnedAway: number
+  /** Sales recorded while stock was 0 — usually a batch that wasn't logged. */
+  salesWhileOut: number
+  ratePerHour: number
+}
+
+export interface CookingAuditProduct {
+  productCode: string
+  name: string
+  sellOuts: number
+  restocked: number
+  notRestocked: number
+  avgWaitMin: number | null
+  maxWaitMin: number | null
+  totalWaitMin: number
+  avgReactionMin: number | null
+  avgCookMin: number | null
+  batches: number
+  turnedAway: number
+  salesWhileOut: number
+  ratePerHour: number | null
+  recookThreshold: number
+  suggestedThreshold: number | null
+  raiseThreshold: boolean
+}
+
+export interface CookingAudit {
+  outlet: string
+  startDate: string
+  endDate: string
+  episodes: CookingAuditEpisode[]
+  products: CookingAuditProduct[]
+  totals: {
+    sellOuts: number
+    notRestocked: number
+    avgWaitMin: number | null
+    maxWaitMin: number | null
+    turnedAway: number
+    productsToRaise: number
+  }
+  settings: { rateWindowMin: number; bufferMin: number }
+}
+
+export const getCookingAudit = (startDate: string, endDate: string, auth: AuthContext) =>
+  api.cookingAudit<CookingAudit>(startDate, endDate, auth)

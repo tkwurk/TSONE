@@ -5,6 +5,7 @@ import { Badge, Button, DataTable, Field, FormRow, Notice, Panel, Stats, SubTabs
 import { useI18n } from '@/i18n'
 import { useKitchenRequestFeed } from '@/features/notifications'
 import { RequestDetails } from './RequestDetails'
+import { CookingAudit } from './CookingAudit'
 import {
   getCookingHistory,
   getCookingProducts,
@@ -16,7 +17,7 @@ import {
   type TodayReportItem,
 } from '../api'
 
-type Tab = 'cook' | 'requests' | 'today' | 'history'
+type Tab = 'cook' | 'requests' | 'today' | 'history' | 'audit'
 type Msg = { tone: 'info' | 'error'; text: string }
 
 const nowLocal = () => localDateTime()
@@ -217,6 +218,7 @@ export function KitchenPanel({ auth, focusRequest }: { auth: AuthContext; focusR
     { id: 'requests' as const, label: `🔔 ${t('kitchen.requests')} (${open.length})` },
     { id: 'today' as const, label: `📊 ${t('kitchen.today')}` },
     { id: 'history' as const, label: `📜 ${t('kitchen.history')}` },
+    { id: 'audit' as const, label: `⏱️ ${t('audit.tab')}` },
   ]
 
   return (
@@ -485,6 +487,7 @@ export function KitchenPanel({ auth, focusRequest }: { auth: AuthContext; focusR
           )}
         </>
       )}
+      {tab === 'audit' && <CookingAudit auth={auth} />}
     </Panel>
   )
 }
