@@ -12,6 +12,7 @@ import {
   setMuted,
   type NotifyPermission,
 } from '../systemNotify'
+import { playChime, setSoundOn, soundOn } from '../sound'
 import './notifications.css'
 
 /** Seconds before the test push is sent: time to close TSONE and see it arrive while closed. */
@@ -28,6 +29,7 @@ export function NotificationBell({ onOpenRequest, onViewAll }: { onOpenRequest: 
   const [open, setOpen] = useState(false)
   const [permission, setPermission] = useState<NotifyPermission>(notifyPermission)
   const [muted, setMutedState] = useState(isMuted)
+  const [sound, setSound] = useState(soundOn)
   const [test, setTest] = useState<{ state: 'idle' | 'sending' | 'sent' | 'error'; error?: string }>({ state: 'idle' })
   const panelRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -150,6 +152,18 @@ export function NotificationBell({ onOpenRequest, onViewAll }: { onOpenRequest: 
           </div>
 
           <div className="notify__settings">
+            <label className="notify__toggle">
+              <input
+                type="checkbox"
+                checked={sound}
+                onChange={(e) => {
+                  setSoundOn(e.target.checked)
+                  setSound(e.target.checked)
+                  if (e.target.checked) playChime() // let them hear it
+                }}
+              />
+              🔊 {t('notify.soundInApp')}
+            </label>
             {permission === 'unsupported' || needsInstall ? (
               <p className="muted">{needsInstall ? t('notify.needsInstall') : t('notify.unsupported')}</p>
             ) : permission === 'default' ? (

@@ -79,7 +79,11 @@ export interface SystemNotice {
 export async function showSystemNotification(n: SystemNotice, onClickFallback?: () => void): Promise<void> {
   if (!canShowSystemNotifications()) return
   const icon = `${import.meta.env.BASE_URL}pwa-192x192.png`
-  const options: NotificationOptions & { renotify?: boolean; timestamp?: number } = {
+  const options: NotificationOptions & { renotify?: boolean; timestamp?: number; vibrate?: number[] } = {
+    // Browsers can't play a custom sound; not silent = the device's notification sound.
+    silent: false,
+    vibrate: [250, 120, 250, 120, 500],
+    requireInteraction: true,
     tag: n.tag,
     body: n.body,
     icon,

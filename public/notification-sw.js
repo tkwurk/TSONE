@@ -10,6 +10,8 @@
 
 const KITCHEN_PUSH = 'tsone:kitchen-push'
 const OPEN_REQUEST = 'tsone:open-kitchen-request'
+// Browsers can't play a custom sound; not silent = the phone's notification sound.
+const ALERT = { silent: false, vibrate: [250, 120, 250, 120, 500] }
 
 function appWindows() {
   const scope = self.registration.scope
@@ -33,6 +35,7 @@ self.addEventListener('push', (event) => {
     event.waitUntil(
       self.registration.showNotification(d.title || 'TSONE', {
         body: d.body || '',
+        ...ALERT,
         tag: 'tsone-test',
         renotify: true,
         icon: scope + 'pwa-192x192.png',
@@ -56,6 +59,9 @@ self.addEventListener('push', (event) => {
       if (d.requestId) url.searchParams.set('kitchenRequest', d.requestId)
       await self.registration.showNotification(d.title || 'TSONE', {
         body: d.body || '',
+        ...ALERT,
+        // Kitchen alerts stay until someone looks at them (desktop; phones keep them anyway).
+        requireInteraction: true,
         tag: d.tag || 'kitchen-request:' + (d.requestId || ''),
         renotify: d.renotify === '1',
         icon: scope + 'pwa-192x192.png',

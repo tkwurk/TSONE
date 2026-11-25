@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui'
 import { useI18n } from '@/i18n'
 import { isReminder, useKitchenRequestFeed } from '../feedContext'
+import { playChime, primeSound } from '../sound'
 
 const SHOW_MS = 12_000
 
@@ -15,6 +16,13 @@ export function ArrivalToast({ onOpenRequest }: { onOpenRequest: (requestId: str
   const { arrival, dismissArrival, markRead } = useKitchenRequestFeed()
   const [hold, setHold] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+
+  // Unlock audio on the first tap, then chime once per arrival.
+  useEffect(() => primeSound(), [])
+  const seq = arrival?.seq
+  useEffect(() => {
+    if (seq) playChime()
+  }, [seq])
 
   useEffect(() => {
     if (!arrival || hold) return
