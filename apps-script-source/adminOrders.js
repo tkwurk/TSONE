@@ -530,12 +530,17 @@ function bulkUpdateOrders(params) {
 function deleteOrderDataSecure(params) {
   // Extract original parameters from SecurityWrapper enhanced object
   const originalParams = extractOriginalParams(params);
-  return deleteOrderData(originalParams);
+  const result = deleteOrderData(originalParams);
+  // Rows were removed from these sheets: the cash warehouse must re-read them.
+  if (result && result.success && typeof CashWarehouse !== 'undefined') CashWarehouse.markForRebuild(['ORDERS', 'DEPOSITS', 'EXPENSES']);
+  return result;
 }
 
 function bulkUpdateOrdersSecure(params) {
   const originalParams = extractOriginalParams(params);
-  return bulkUpdateOrders(originalParams);
+  const result = bulkUpdateOrders(originalParams);
+  if (result && result.success && typeof CashWarehouse !== 'undefined') CashWarehouse.markForRebuild(['ORDERS']);
+  return result;
 }
 
 function getOutletsForAdmin(params) {

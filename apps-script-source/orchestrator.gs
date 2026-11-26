@@ -65,7 +65,8 @@ var Orchestrator = {
     'push.subscribed': ['pushSubscribe'],
     'push.unsubscribed': ['pushUnsubscribe'],
     'push.test.requested': ['pushTest'],
-    'cooking.audit.requested': ['cookingAudit']
+    'cooking.audit.requested': ['cookingAudit'],
+    'cash.daily.requested': ['cashDaily']
   },
 
   /** step name -> runner. Each runner returns an apiOk/apiFail-style envelope. */
@@ -89,7 +90,8 @@ var Orchestrator = {
     pushSubscribe: function (payload, ctx, bag) { return NotificationWorker.subscribe(payload, ctx); },
     pushUnsubscribe: function (payload, ctx, bag) { return NotificationWorker.unsubscribe(payload, ctx); },
     pushTest: function (payload, ctx, bag) { return NotificationWorker.sendTest(payload, ctx); },
-    cookingAudit: function (payload, ctx, bag) { return ReportingWorker.cookingAudit(payload, ctx); }
+    cookingAudit: function (payload, ctx, bag) { return ReportingWorker.cookingAudit(payload, ctx); },
+    cashDaily: function (payload, ctx, bag) { return ReportingWorker.dailyCash(payload, ctx); }
   },
 
   /** Builds the shared context from a SecurityWrapper params object. */

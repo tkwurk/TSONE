@@ -40,6 +40,7 @@ export type ApiEventType =
   | 'push.unsubscribed'
   | 'push.test.requested'
   | 'cooking.audit.requested'
+  | 'cash.daily.requested'
   | 'auth.login'
   | 'auth.logout'
   | 'rpc'

@@ -1,0 +1,135 @@
+.cd-wrap {
+  overflow-x: auto;
+  max-height: 70vh;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.cd-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cd-table th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 9px 12px;
+  background: var(--accent-bg);
+  color: var(--text-h);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 2px solid var(--accent-border);
+}
+
+.cd-table td {
+  padding: 7px 12px;
+  text-align: right;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+/* Date column stays visible while scrolling sideways. */
+.cd-table .cd-date {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  text-align: left;
+}
+
+.cd-table th.cd-date {
+  z-index: 3;
+}
+
+.cd-table td.cd-indent {
+  padding-left: 22px;
+}
+
+.cd-table tbody tr:hover td {
+  background: var(--accent-bg);
+}
+
+.cd-sub td {
+  font-weight: 700;
+  background: var(--accent-bg);
+  border-top: 2px solid var(--accent-border);
+}
+
+.cd-total td {
+  font-weight: 700;
+  background: var(--accent-bg);
+  border-top: 2px solid var(--accent);
+}
+
+.cd-today td {
+  background: rgba(22, 163, 74, 0.08);
+}
+
+.cd-today-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(22, 163, 74, 0.18);
+  color: #15803d;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.cd-pos {
+  color: #16a34a;
+}
+
+.cd-neg {
+  color: #dc2626;
+}
+
+.cd-zero {
+  color: #9ca3af;
+}
+
+.cd-net-pos {
+  color: #15803d;
+  font-weight: 600;
+}
+
+.cd-net-neg {
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.cd-cih-pos {
+  color: #15803d;
+  font-weight: 700;
+}
+
+.cd-cih-neg {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .cd-year {
+    display: none;
+  }
+
+  .cd-table {
+    font-size: 12px;
+  }
+
+  .cd-table th,
+  .cd-table td {
+    padding: 6px 8px;
+  }
+
+  .cd-table td.cd-indent {
+    padding-left: 12px;
+  }
+}

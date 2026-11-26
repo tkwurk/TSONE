@@ -65,7 +65,7 @@ Data (Google Sheets today)            → swappable for Firestore / Postgres lat
 | Orchestrator | Routing, workflow state, logging decisions | Business logic, data writes |
 | Sales Worker | Checkout/transaction persistence (delegates to `saveOrderSecure`) | Stock, reporting, validation |
 | Inventory Worker | Stock ledger + restock | Sales pricing, reporting |
-| Reporting Worker | Report/summary generation | Writing transactional data |
+| Reporting Worker | Report/summary generation; derived report tables kept incrementally (`DailyCashWarehouse`, `WarehouseState` — see `cashWarehouse.js`) | Writing transactional data |
 | Shift Worker | Shift handover reports (`ShiftReports`): expected vs counted cash, kitchen confirmation | Stock, sales, pricing |
 | Notification Worker | Push subscriptions (`PushSubscriptions`) and push delivery via FCM | Deciding business events; must never throw into the caller |
 | Reflection Agent | Validation, compliance, reconciliation | Mutating business data |
@@ -82,7 +82,7 @@ calls `Repo`. Known events include `checkout.completed`, `stock.updated`,
 `stock.history.schedule.requested`, `consumption.closing.requested`,
 `consumption.recorded`, `consumption.history.requested`, `shift.report.requested`, `shift.report.submitted`, `shift.history.requested`,
 `push.subscribed`, `push.unsubscribed`, `push.test.requested`,
-`cooking.audit.requested`,
+`cooking.audit.requested`, `cash.daily.requested`,
 `report.requested`, and `purchase.recorded`.
 Keep the `// Copilot:` intent comment above each worker method.
 

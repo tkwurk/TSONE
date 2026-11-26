@@ -15,6 +15,21 @@
 // validation before it reaches the Orchestrator.
 var ReportingWorker = {
 
+  // Copilot: Daily cash report for the Deposits tab: per-day sales, expenses,
+  // cash purchases, deposits, daily net and running cash in hand, with monthly
+  // subtotals and the all-time total. Reads the incremental DailyCashWarehouse
+  // (only rows added since the last sync are read), not the full source sheets.
+  dailyCash: function (params, ctx) {
+    var session = requirePermission_(params, 'deposits');
+    var sync = CashWarehouse.sync();
+    CashWarehouse.ensureNightlyTrigger();
+    var report = buildDailyCashReport_(CashWarehouse.dailyRows(session.outlet || ''));
+    report.stale = !sync.ok;
+    report.outlet = session.outlet || '';
+    report.today = typeof getAppDateKey_ === 'function' ? getAppDateKey_(new Date()) : '';
+    return apiOk(report, 'CASH_DAILY_OK');
+  },
+
   // Copilot: Cooking audit for the authenticated outlet: every sell-out of a cooked
   // product in the period, how long until the next batch was ready, customers
   // turned away meanwhile, and a suggested recook threshold per product.

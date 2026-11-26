@@ -4,9 +4,10 @@ import { Button, DataTable, Field, FormRow, Notice, Panel, Select, Stats, SubTab
 import { useI18n } from '@/i18n'
 import { fetchPaymentMethodsForModule, paymentIcon } from '@/features/checkout'
 import type { PaymentMethod } from '@/features/checkout'
+import { DailyCashReport } from './DailyCashReport'
 import { fetchCashSummary, fetchDepositAccounts, fetchDepositHistory, recordDeposit, type Account, type CashSummary, type DepositRow } from '../api'
 
-type Tab = 'cash' | 'deposit' | 'history'
+type Tab = 'cash' | 'daily' | 'deposit' | 'history'
 type Msg = { tone: 'info' | 'error'; text: string }
 
 /**
@@ -78,6 +79,7 @@ export function DepositsPanel({ auth }: { auth: AuthContext }) {
       <SubTabs
         tabs={[
           { id: 'cash', label: `💵 ${t('dep.cashPosition')}` },
+          { id: 'daily', label: `📅 ${t('cashDaily.tab')}` },
           { id: 'deposit', label: `➕ ${t('dep.make')}` },
           { id: 'history', label: `📜 ${t('dep.history')}` },
         ]}
@@ -92,6 +94,7 @@ export function DepositsPanel({ auth }: { auth: AuthContext }) {
             <Button variant="ghost" onClick={loadSummary} disabled={loadingSummary}>
               {loadingSummary ? t('common.loading') : '↻'}
             </Button>
+            <Button variant="ghost" onClick={() => setTab('daily')}>📅 {t('cashDaily.tab')}</Button>
             <Button onClick={() => setTab('deposit')}>➕ {t('dep.make')}</Button>
           </div>
           {summary ? (
@@ -117,6 +120,8 @@ export function DepositsPanel({ auth }: { auth: AuthContext }) {
           )}
         </>
       )}
+
+      {tab === 'daily' && <DailyCashReport auth={auth} />}
 
       {tab === 'deposit' && (
         <>

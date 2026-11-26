@@ -1,4 +1,4 @@
-import { callPositional, callSecure } from '@/services/api'
+import { api, callPositional, callSecure } from '@/services/api'
 import type { AuthContext } from '@/services/api'
 
 export interface CashSummary {
@@ -60,3 +60,44 @@ export const recordDeposit = (
   p: { amount: number; account: string; note: string; paymentMethod: string },
   auth: AuthContext,
 ) => callSecure<{ message?: string }>('recordDepositSecure', p, auth)
+
+// ---------- Daily cash report (all totals computed by the server) ----------
+interface CashDailyAmounts {
+  totalSales: number
+  cashSales: number
+  cashExpenses: number
+  deductibleExpenses: number
+  cashPurchases: number
+  deposits: number
+  depositsQris: number
+  depositsTransfer: number
+  salesByPaymentMethod: Record<string, number>
+  depositsByPaymentMethod: Record<string, number>
+  cashInHand: number
+}
+
+export interface CashDailyDay extends CashDailyAmounts {
+  date: string
+  month: string
+  dailyNet: number
+}
+
+export interface CashDailyMonth extends CashDailyAmounts {
+  month: string
+  days: number
+  net: number
+}
+
+export interface CashDailyReport {
+  outlet: string
+  today: string
+  days: CashDailyDay[]
+  months: CashDailyMonth[]
+  total: CashDailyAmounts & { net: number }
+  salesMethods: string[]
+  depositMethods: string[]
+  /** The incremental sync was skipped (another one was running): numbers may lag a little. */
+  stale?: boolean
+}
+
+export const fetchCashDailyReport = (auth: AuthContext) => api.cashDaily<CashDailyReport>(auth)
